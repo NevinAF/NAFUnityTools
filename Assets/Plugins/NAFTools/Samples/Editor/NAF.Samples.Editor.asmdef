@@ -1,0 +1,18 @@
+{
+    "name": "NAF.Samples.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:47b31cc651e0a7e4896bc466ee20364f",
+        "GUID:42d039a22a99f564a8f00fc7e0285915",
+        "GUID:93cde4ef44c29354b865593d8e90d978"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

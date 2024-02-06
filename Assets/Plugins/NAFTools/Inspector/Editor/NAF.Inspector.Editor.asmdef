@@ -1,0 +1,19 @@
+{
+    "name": "NAF.Inspector.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:93cde4ef44c29354b865593d8e90d978",
+        "GUID:bcbe95871c0dd7a4489550d0fe694921"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

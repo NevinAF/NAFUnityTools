@@ -1,0 +1,16 @@
+{
+    "name": "NAF.Samples",
+    "rootNamespace": "",
+    "references": [
+        "GUID:93cde4ef44c29354b865593d8e90d978"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
