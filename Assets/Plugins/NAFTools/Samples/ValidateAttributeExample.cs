@@ -5,17 +5,21 @@ namespace NAF.Samples
 
 	public class ValidateAttributeExample : NAFSampleBehaviour
 	{
-		[Description("The ValidateAttribute is used to conditionally display an inline label. By default, when the condition evaluates to false, an error icon is displayed to the right of the field. This attribute extends all functionality of 'InlineLabelAttribute' for customizing the label content, style, and alignment.")]
-		[Space(20)]
+		[Description("The ValidateAttribute is used to conditionally display an inline label. By default, when the condition evaluates to false, an error icon is displayed to the right of the field. This attribute extends all functionality of 'InlineLabelAttribute' for customizing the label content, style, and alignment."), Space(20)]
 
 		[Header("Helper Fields")]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Title__ = 0;
 
 		public bool Toggle = true;
 		public GameObject Target = null;
 
+
 		[Header("Basic Validate")]
 		[Description("The following examples only populate the condition, which is a string expression that is interpreted as a boolean (non default/false).")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __BasicValidate__ = 0;
+
 
 		[Validate("{1} > 0")]
 		public int Positive = -12;
@@ -32,9 +36,12 @@ namespace NAF.Samples
 		[Validate("(bool){1} || !" + nameof(Toggle))]
 		public GameObject NotNullWhenToggle = null;
 
+
 		[Header("Validate Labels/Icons")]
 		[Description("In addition to a condition, the following also have some custom the label content")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __LabelsIcons__ = 0;
+
 
 		[Validate("{1}.Length > 0", Icon = EditorIcons.d_console_warnicon, Label = "Empty is Skipped!")]
 		public int[] ArrayNotEmptyWarning = new int[0];
@@ -42,9 +49,12 @@ namespace NAF.Samples
 		[Validate("{1}?.gameObject == " + nameof(Target), Icon = EditorIcons.d_console_infoicon, Label = "{1}?.gameObject.name + \" is not Target!\"")]
 		public Transform NotOnTarget = null;
 
+
 		[Header("Validate Styles")]
 		[Description("In addition to a condition, the following also have some custom the label style")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Styles__ = 0;
+
 
 		[Validate("!{1} || (bool)" + nameof(Target), Style = "EditorStyles.label")]
 		public bool OnWithoutObject = true;
@@ -54,14 +64,20 @@ namespace NAF.Samples
 
 		private GUIStyle CustomStyleFunc => new GUIStyle("miniLabel") { normal = { textColor = UnityEngine.Random.ColorHSV() }, fontStyle = FontStyle.Italic };
 
+
 		[Header("Required Attribute")]
 		[Description("The RequiredAttribute is the same as a ValidateAttribute with the condition always set to '{1}'. This will always evaluate to true iff the field is not the default value (null, 0, false, etc).")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Required__ = 0;
+
 
 		[Required]
 		public GameObject RequiredObject = null;
 
 		[Required]
 		public LayerMask RequiredMask = default;
+
+		[Required, Min(0)]
+		public float RequiredSeconds = default;
 	}
 }

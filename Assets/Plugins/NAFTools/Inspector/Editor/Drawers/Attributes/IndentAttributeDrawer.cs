@@ -1,7 +1,5 @@
 namespace NAF.Inspector.Editor
 {
-	using System;
-	using System.ComponentModel;
 	using NAF.Inspector;
 	using UnityEditor;
 	using UnityEngine;
@@ -9,19 +7,19 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(IndentAttribute))]
 	public class IndentAttributeDrawer : NAFPropertyDrawer
 	{
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			int indent = (this.attribute as IndentAttribute)!.Indent;
+			int indent = ((IndentAttribute)Attribute).Indent;
 			EditorGUI.indentLevel += indent;
 
-			EditorGUI.PropertyField(position, property, label, true);
+			base.OnGUI(position, property, label);
 
 			EditorGUI.indentLevel -= indent;
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
 		{
-			return EditorGUI.GetPropertyHeight(property, label);
+			return base.OnGetHeight(property, label);
 		}
 	}
 }

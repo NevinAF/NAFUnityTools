@@ -16,7 +16,7 @@ namespace NAF.Inspector.Editor
 
 		public static Func<object?, object?, T?>? Load(Type hostType, Type fieldType, object? expressionOrValue)
 		{
-			if (expressionOrValue is string expression)
+			if (expressionOrValue is string expression && expression.Length > 0)
 			{
 				try 
 				{
@@ -38,7 +38,7 @@ namespace NAF.Inspector.Editor
 			{
 				var result = t.Result;
 
-				if (expressionOrValue is string expression)
+				if (expressionOrValue is string expression && expression.Length > 0)
 				{
 					try 
 					{

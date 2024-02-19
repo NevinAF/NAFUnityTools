@@ -4,23 +4,33 @@ namespace NAF.Inspector.Editor
 	using UnityEditor;
 	using UnityEngine;
 	using System;
+	using System.Threading.Tasks;
 
 	[CustomPropertyDrawer(typeof(InlineButtonAttribute))]
 	public class InlineButtonAttributeDrawer : InlineLabelAttributeDrawer
 	{
 		private Func<object, object, object> method;
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			base.TryUpdate(property);
+			return Task.WhenAll(
+				base.OnEnable(property),
+				PropertyFieldCompiler<object>.Load(property, ((InlineButtonAttribute)Attribute).Expression).ContinueWith(t =>
+				{
+					method = t.Result;
+				})
+			);
+		}
 
-			InlineButtonAttribute attribute = (InlineButtonAttribute)this.attribute;
+		protected override void OnUpdate(SerializedProperty property)
+		{
+			InlineButtonAttribute attribute = (InlineButtonAttribute)Attribute;
 			method = PropertyFieldCompiler<object>.Get(property, attribute.Expression);
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			InlineButtonAttribute attribute = (this.attribute as InlineButtonAttribute)!;
+			InlineButtonAttribute attribute = (InlineButtonAttribute)Attribute;
 			attribute.Label ??= ObjectNames.NicifyVariableName(attribute.Expression);
 
 			if (DrawAsButton(attribute.Alignment, position, content, style, property, label))

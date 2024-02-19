@@ -18,13 +18,13 @@
 
 // 		public bool 
 
-// 		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+// 		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
 // 		{
 			
 // 		}
 
 
-// 		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+// 		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 // 		{
 // 			var a = (attribute as IArrayPropertyAttribute)!;
 

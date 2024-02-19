@@ -5,8 +5,10 @@ namespace NAF.Samples
 
 	public class UnitsAttributeExample : NAFSampleBehaviour
 	{
-		[Description("The UnitsAttribute adds a suffix dropdown to a number field in the inspector. The suffix can be used to visually convert the number to a different unit of measurement. The value is always stored as the base unit defined by the attribute. Used to specify the unit of measurement for a field without needing to suffix the field, and this offers more flexibility than a raw suffix label.")]
-		[Space(20)]
+		[Description("The UnitsAttribute adds a suffix dropdown to a number field in the inspector. The suffix can be used to visually convert the number to a different unit of measurement. The value is always stored as the base unit defined by the attribute. Used to specify the unit of measurement for a field without needing to suffix the field, and this offers more flexibility than a raw suffix label."), Space(20)]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Title__ = 0;
+
 
 		[Units(UnitsAttribute.Time.Seconds)]
 		public float TimeInSeconds = 12.34f;

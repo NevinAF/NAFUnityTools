@@ -4,6 +4,7 @@ namespace NAF.Inspector.Editor
 	using UnityEditor;
 	using UnityEngine;
 	using System;
+	using System.Threading.Tasks;
 
 	[CustomPropertyDrawer(typeof(InlineLabelAttribute))]
 	[CustomPropertyDrawer(typeof(SuffixAttribute))]
@@ -14,30 +15,31 @@ namespace NAF.Inspector.Editor
 		protected GUIStyle style;
 		protected SerializedProperty property;
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			var contentAttribute = this.attribute as IContentAttribute;
+			var contentAttribute = (IContentAttribute)Attribute;
+			return AttributeEvaluator.Load(contentAttribute, property);
+		}
+
+		protected override void OnUpdate(SerializedProperty property)
+		{
+			var contentAttribute = (IContentAttribute)Attribute;
 			AttributeEvaluator.PopulateContent(contentAttribute, property, ref content);
 			style = AttributeEvaluator.ResolveStyle(contentAttribute, property) ?? EditorStyles.miniLabel;
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
-		{
-			return EditorGUI.GetPropertyHeight(property, label, property.isExpanded);
-		}
-
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			if (content == null || style == null)
 			{
-				EditorGUI.PropertyField(position, property, label, property.isExpanded);
+				base.OnGUI(position, property, label);
 				return;
 			}
 
-			DrawAsLabel((this.attribute as InlineLabelAttribute).Alignment, position, content, style, property, label);
+			DrawAsLabel(((InlineLabelAttribute)Attribute).Alignment, position, content, style, property, label);
 		}
 	
-		public static void DrawAsLabel(LabelAlignment alignment, Rect position, GUIContent content, GUIStyle style, SerializedProperty property, GUIContent label, bool disableProperty = false)
+		public void DrawAsLabel(LabelAlignment alignment, Rect position, GUIContent content, GUIStyle style, SerializedProperty property, GUIContent label, bool disableProperty = false)
 		{
 			switch (alignment)
 			{
@@ -45,12 +47,12 @@ namespace NAF.Inspector.Editor
 					InlineGUI.InlineLabel(ref position, content, style, false);
 					position.xMin += 12;
 					using (new DisabledScope(!GUI.enabled || disableProperty))
-						EditorGUI.PropertyField(position, property, label, property.isExpanded);
+						base.OnGUI(position, property, label);
 					break;
 
 				case LabelAlignment.Right:
 					InlineGUI.InlineLabel(ref position, content, style, true);
-					EditorGUI.PropertyField(position, property, label, property.isExpanded);
+					base.OnGUI(position, property, label);
 					break;
 
 				case LabelAlignment.BetweenLeft:
@@ -63,7 +65,7 @@ namespace NAF.Inspector.Editor
 					else InlineGUI.InlineLabel(ref propertyRect, content, style, false);
 
 					EditorGUI.LabelField(labelRect, label);
-					EditorGUI.PropertyField(propertyRect, property, GUIContent.none, property.isExpanded);
+					base.OnGUI(propertyRect, property, GUIContent.none);
 					break;
 
 				default:
@@ -71,7 +73,7 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		public static bool DrawAsButton(LabelAlignment alignment, Rect position, GUIContent content, GUIStyle style, SerializedProperty property, GUIContent label, bool disableProperty = false)
+		public bool DrawAsButton(LabelAlignment alignment, Rect position, GUIContent content, GUIStyle style, SerializedProperty property, GUIContent label, bool disableProperty = false)
 		{
 			bool result;
 
@@ -81,13 +83,13 @@ namespace NAF.Inspector.Editor
 					result = InlineGUI.InlineButton(ref position, content, style, false);
 					position.xMin += 12;
 					using (new DisabledScope(!GUI.enabled || disableProperty))
-						EditorGUI.PropertyField(position, property, label, property.isExpanded);
+						base.OnGUI(position, property, label);
 					return result;
 
 				case LabelAlignment.Right:
 					result = InlineGUI.InlineButton(ref position, content, style, true);
 					using (new DisabledScope(!GUI.enabled || disableProperty))
-						EditorGUI.PropertyField(position, property, label, property.isExpanded);
+						base.OnGUI(position, property, label);
 					return result;
 
 				case LabelAlignment.BetweenLeft:
@@ -101,7 +103,7 @@ namespace NAF.Inspector.Editor
 
 					EditorGUI.LabelField(labelRect, label);
 					using (new DisabledScope(!GUI.enabled || disableProperty))
-						EditorGUI.PropertyField(propertyRect, property, GUIContent.none, property.isExpanded);
+						base.OnGUI(propertyRect, property, GUIContent.none);
 					return result;
 
 				default:

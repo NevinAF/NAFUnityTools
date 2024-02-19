@@ -5,10 +5,13 @@ namespace NAF.Samples
 
 	public class ReadonlyAttributeExample : NAFSampleBehaviour
 	{
-		[Description("The ReadonlyAttribute is a property drawer that makes a field read-only in the inspector. The attribute can be enabled/disabled based on a string expression as long as the expression evaluates to a boolean.")]
-		[Space(20)]
+		[Description("The ReadonlyAttribute is a property drawer that makes a field read-only in the inspector. The attribute can be enabled/disabled based on a string expression as long as the expression evaluates to a boolean."), Space(20)]
+
 
 		[Header("Helper Fields")]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Title__ = 0;
+
 
 		public int number = 0;
 		public Vector2 vector2 = Vector2.zero;
@@ -17,7 +20,9 @@ namespace NAF.Samples
 
 		[Header("Unconditional Readonly")]
 		[Description("When used without any condition, the field is always read-only. The 'DrawOnElements' option can be used to draw the attribute on each element of an array rather than the array itself.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Readonly__ = 0;
+
 
 		[Readonly]
 		public int ReadonlyConstantField = 1234;
@@ -59,7 +64,9 @@ namespace NAF.Samples
 
 		[Header("Disable If")]
 		[Description("The DisableIf attribute is a property drawer that disables a field in the inspector based on a string expression as long as the expression evaluates to a boolean.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __DisableIf__ = 0;
+
 
 		[DisableIf("=" + nameof(gameobject))]
 		[Tooltip("This condition is a field and thus evaluates to true when not default/null, and false otherwise.")]
@@ -79,7 +86,9 @@ namespace NAF.Samples
 
 		[Header("Enable If")]
 		[Description("The EnableIf attribute is a property drawer that enables a field in the inspector based on a string expression as long as the expression evaluates to a boolean.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __EnableIf__ = 0;
+
 
 		[EnableIf("=(bool)gameobject && gameobject.activeSelf")]
 		[Tooltip("This condition is a predicate expression and thus evaluates to true when the expression is true, and false otherwise.")]

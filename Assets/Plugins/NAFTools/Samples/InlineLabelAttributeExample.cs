@@ -5,12 +5,14 @@ namespace NAF.Samples
 
 	public class InlineLabelAttributeExample : NAFSampleBehaviour
 	{
-		[Description("The InlineLabel attribute is an attribute that allows you to add a label to a field. The label can contain text, an icon, and a tooltip. The label can be styled and aligned. All values can be dynamically generated using string expressions.")]
-		[Space(20)]
+		[Description("The InlineLabel attribute is an attribute that allows you to add a label to a field. The label can contain text, an icon, and a tooltip. The label can be styled and aligned. All values can be dynamically generated using string expressions."), Space]
+
 
 		[Header("Basic InlineLabel")]
 		[Description("Changing the content that is displayed in the label.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Title__ = 0;
+
 
 		[InlineLabel(Label = "This Label!")]
 		public int StringLabel = 1234;
@@ -24,9 +26,12 @@ namespace NAF.Samples
 		[InlineLabel(Label = "Animation!", Icon = EditorIcons.Animation_Icon, Tooltip = "Animation Tooltip!")]
 		public KeyCode FullStringContentLabel = KeyCode.A;
 
+
 		[Header("Styling")]
 		[Description("Changing the style of the label. The style can be an expression that results in a GUIStyle, or a string that is the name of a built-in GUIStyle.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Styling__ = 0;
+
 
 		[InlineLabel(Label = "BoldStyle!", Style = "EditorStyles.boldLabel")]
 		public float BoldLabel = 3.14f;
@@ -40,9 +45,11 @@ namespace NAF.Samples
 		private GUIStyle CustomStyleFunc => new GUIStyle("miniLabel") { normal = { textColor = UnityEngine.Random.ColorHSV() }, fontStyle = FontStyle.Italic };
 
 
-		[Header("Alignment")]
+		[Header("Alignment (basic)")]
 		[Description("Changes the position of the label relative to the field. The label can be aligned to the left, right, or between the label and the field. The label can also be applied to arrays but the 'between' behavior can result in unwanted behavior.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Alignment__ = 0;
+
 
 		[InlineLabel(Label = "Left", Alignment = LabelAlignment.Left)]
 		public Vector3 LeftLabel = Vector3.left;
@@ -56,7 +63,11 @@ namespace NAF.Samples
 		[InlineLabel(Label = "Right", Alignment = LabelAlignment.Right)]
 		public Vector2 RightLabel = Vector2.right;
 
-		[Space]
+
+		[Header("Alignment (arrays)")]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Arrays__ = 0;
+
 
 		[InlineLabel(Label = "Left Array", Alignment = LabelAlignment.Left)]
 		public byte[] LeftLabelArray = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -70,9 +81,12 @@ namespace NAF.Samples
 		[InlineLabel(Label = "Right Array", Alignment = LabelAlignment.Right)]
 		public byte[] RightLabelArray = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
 
+
 		[Header("Prefix & Suffix")]
 		[Description("The Prefix and Suffix attributes are an extension of the InlineLabel attribute, allowing you to create an inline label with some text. All properties of the InlineLabel attribute are available, but this provides a slightly more convenient way to add a prefix or suffix to a field.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __PrefixSuffix__ = 0;
+
 
 		[Suffix("Suffix")]
 		public AnimationCurve SuffixLabel = AnimationCurve.Linear(0, 0, 1, 1);
@@ -80,9 +94,12 @@ namespace NAF.Samples
 		[Prefix("Prefix")]
 		public Color PrefixLabel = Color.green;
 
+
 		[Header("Dynamic Examples")]
 		[Description("All values of the InlineLabel attribute can be dynamically generated using string expressions. This allows you to create labels that change based on the value of the field.")]
-		[Space]
+		// __<>__ prevents drawing definitions, this field prevents attributes being shown on the following field.
+		[Space, HideIf(true)] public byte __Dynamic__ = 0;
+
 
 		[InlineLabel(Label = "Math.Round({1}) + ' is a nicer number'")]
 		public double RoundedLabel = 4.35d;

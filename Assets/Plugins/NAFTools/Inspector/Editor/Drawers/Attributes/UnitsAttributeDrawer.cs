@@ -27,7 +27,7 @@ namespace NAF.Inspector.Editor
 			{ typeof(UnitsAttribute.Volume), Enum.GetNames(typeof(UnitsAttribute.Volume)).Select(x => new GUIContent(x, null, null)).ToArray() },
 		};
 
-		public override Task TryEnable(in SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
 			var propertyType = property.propertyType;
 			if (propertyType != SerializedPropertyType.Float &&
@@ -41,17 +41,19 @@ namespace NAF.Inspector.Editor
 				throw new NotSupportedException("Property type '" + propertyType + "' is not supported by the UnitsAttribute.");
 			}
 
-			return base.TryEnable(property);
+			return base.OnEnable(property);
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
 		{
-			return EditorGUI.GetPropertyHeight(property, label);
+			float result = UnityInternals.EditorGUI_GetSinglePropertyHeight(property, label);
+			property.NextVisible(false); // FIXME: Skip all other drawers?
+			return result;
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			UnitsAttribute units = (attribute as UnitsAttribute)!;
+			UnitsAttribute units = (UnitsAttribute)Attribute!;
 
 			int index = InlineGUI.InlinePopup(ref position, Convert.ToInt32(units.value), TypeNames[units.value.GetType()]);
 			units.value = Enum.ToObject(units.value.GetType(), index);
@@ -181,6 +183,8 @@ namespace NAF.Inspector.Editor
 			else throw new NotImplementedException("Property type '" + property.propertyType + "' is supported but somehow was not drawn properly.");
 
 			EditorGUI.EndProperty();
+
+			property.NextVisible(false); // FIXME: Skip all other drawers?
 		}
 
 		private static GUIContent[] _v2Labels = new GUIContent[] { new GUIContent("X"), new GUIContent("Y") };

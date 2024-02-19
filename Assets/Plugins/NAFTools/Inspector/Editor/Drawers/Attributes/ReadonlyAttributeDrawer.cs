@@ -1,5 +1,6 @@
 namespace NAF.Inspector.Editor
 {
+	using System.Threading.Tasks;
 	using NAF.Inspector;
 	using UnityEditor;
 	using UnityEngine;
@@ -10,20 +11,21 @@ namespace NAF.Inspector.Editor
 	public class ReadonlyAttributeDrawer : NAFPropertyDrawer
 	{
 		private bool _cResult;
-		public override void TryUpdate(SerializedProperty property)
+
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)attribute, property);
+			return AttributeEvaluator.Load((IConditionalAttribute)Attribute, property);
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override void OnUpdate(SerializedProperty property)
 		{
-			return EditorGUI.GetPropertyHeight(property, label);
+			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, property);
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			using (new DisabledScope(_cResult))
-				EditorGUI.PropertyField(position, property, label, true);
+				base.OnGUI(position, property, label);
 		}
 	}
 }

@@ -4,6 +4,7 @@ namespace NAF.Inspector.Editor
 	using UnityEditor;
 	using UnityEngine;
 	using System;
+	using System.Threading.Tasks;
 
 	[CustomPropertyDrawer(typeof(LabelContentAttribute))]
 	public class LabelContentAttributeDrawer : NAFPropertyDrawer
@@ -11,28 +12,34 @@ namespace NAF.Inspector.Editor
 		protected GUIContent content;
 		protected GUIStyle style;
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			var contentAttribute = this.attribute as IContentAttribute;
+			var contentAttribute = (IContentAttribute)Attribute;
+			return AttributeEvaluator.Load(contentAttribute, property);
+		}
+
+		protected override void OnUpdate(SerializedProperty property)
+		{
+			var contentAttribute = (IContentAttribute)Attribute;
 			AttributeEvaluator.PopulateContent(contentAttribute, property, ref content);
 			style = AttributeEvaluator.ResolveStyle(contentAttribute, property);
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
 		{
-			return EditorGUI.GetPropertyHeight(property, label, property.isExpanded);
+			return base.OnGetHeight(property, label);
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			if (style == null)
 			{
-				EditorGUI.PropertyField(position, property, content, property.isExpanded);
+				base.OnGUI(position, property, content);
 				return;
 			}
 
 			EditorGUI.LabelField(position, content, style);
-			EditorGUI.PropertyField(position, property, GUIContent.none, property.isExpanded);
+			base.OnGUI(position, property, GUIContent.none);
 		}
 	}
 }

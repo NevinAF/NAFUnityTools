@@ -1,5 +1,6 @@
 namespace NAF.Inspector.Editor
 {
+	using System.Threading.Tasks;
 	using NAF.Inspector;
 	using UnityEditor;
 	using UnityEngine;
@@ -10,27 +11,30 @@ namespace NAF.Inspector.Editor
 	{
 		private bool _cResult;
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			((ValidateAttribute)this.attribute).Style ??= EditorStyles.helpBox;
-			base.TryUpdate(property);
-			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)attribute, property);
+			return Task.WhenAll(
+				base.OnEnable(property),
+				AttributeEvaluator.Load((IConditionalAttribute)Attribute, property)
+			);
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override void OnUpdate(SerializedProperty property)
 		{
-			return EditorGUI.GetPropertyHeight(property, label);
+			((ValidateAttribute)Attribute).Style ??= EditorStyles.helpBox;
+			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, property);
+			base.OnUpdate(property);
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			if (!_cResult)
 			{
-				base.TryOnGUI(position, property, label);
+				base.OnGUI(position, property, label);
 				return;
 			}
 
-			EditorGUI.PropertyField(position, property, label, true);
+			Tree.OnGUI(position, property, label);
 		}
 	}
 }

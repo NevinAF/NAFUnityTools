@@ -2,6 +2,7 @@
 namespace NAF.Inspector.Editor
 {
 	using System;
+	using System.Collections.Concurrent;
 	using System.Collections.Generic;
 	using System.Linq.Expressions;
 	using System.Reflection;
@@ -106,7 +107,7 @@ namespace NAF.Inspector.Editor
 			public Result ToSpan() => new Result(FieldValues.Span, FieldType, ParentValues.Span, ParentType);
 		}
 
-		private static readonly Dictionary<GrabberKey, GrabberValue?> s_MethodInfoFromPropertyPathCache = new();
+		private static readonly ConcurrentDictionary<GrabberKey, GrabberValue?> s_MethodInfoFromPropertyPathCache = new();
 		private static ResultCache s_lastCache = default;
 
 		private static object?[] s_valueBuffer = new object?[8];
@@ -239,7 +240,7 @@ namespace NAF.Inspector.Editor
 						host = host.GetGenericArguments()[0];
 					}
 
-					index++; // index is at the ']' character right now. The next character must be a '.'.
+					index += 2; // index is at the ']' character right now and the next character must be a '.'.
 					start = index;
 
 					if (index >= length)
@@ -257,7 +258,7 @@ namespace NAF.Inspector.Editor
 				if (field == null)
 				{
 					host = null;
-					s_MethodInfoFromPropertyPathCache.Add(key, null);
+					s_MethodInfoFromPropertyPathCache[key] = null;
 					return null;
 				}
 

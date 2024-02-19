@@ -12,9 +12,9 @@ namespace NAF.Inspector.Editor
 	{
 		private Func<object, object, object> method;
 
-		public override Task TryEnable(in SerializedProperty property)
+		protected override Task OnEnable(in SerializedProperty property)
 		{
-			var attribute = this.attribute as OnValidateAttribute;
+			var attribute = (OnValidateAttribute)Attribute;
 
 			return PropertyFieldCompiler<object>.Load(property, attribute.Expression).ContinueWith(t =>
 			{
@@ -22,7 +22,7 @@ namespace NAF.Inspector.Editor
 			});
 		}
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override void OnUpdate(SerializedProperty property)
 		{
 			var targets = PropertyTargets.GetValues(property);
 			for (int i = 0; i < targets.Length; i++)
@@ -34,16 +34,6 @@ namespace NAF.Inspector.Editor
 					Debug.LogException(e);
 				}
 			}
-		}
-
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
-		{
-			EditorGUI.PropertyField(position, property, label, true);
-		}
-
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
-		{
-			return EditorGUI.GetPropertyHeight(property, label);
 		}
 	}
 }

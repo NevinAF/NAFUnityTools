@@ -3,6 +3,7 @@ namespace NAF.Inspector.Editor
 {
 	using System;
 	using System.Linq;
+	using System.Threading.Tasks;
 	using NAF.Inspector;
 	using UnityEditor;
 	using UnityEngine;
@@ -21,12 +22,15 @@ namespace NAF.Inspector.Editor
 
 		private Component[]? _options;
 
-		public override void TryUpdate(SerializedProperty property)
+		protected override void OnUpdate(SerializedProperty property)
 		{
+			if (FieldInfo == null)
+				throw new Exception("The 'Attached' attribute can only be used on fields!");
+
 			Component target = property.serializedObject.targetObject as Component ??
 				throw new Exception("The 'Attached' attribute can only be used on Component fields (like a MonoBehaviour)!");
 
-			Type componentType = fieldInfo.FieldType.IsArray ? fieldInfo.FieldType.GetElementType()! : fieldInfo.FieldType;
+			Type componentType = FieldInfo.FieldType.IsArray ? FieldInfo.FieldType.GetElementType()! : FieldInfo.FieldType;
 
 			if (!typeof(Component).IsAssignableFrom(componentType))
 			{
@@ -40,7 +44,7 @@ namespace NAF.Inspector.Editor
 
 			Component[] options;
 
-			AttachedAttribute attachedAttribute = (attribute as AttachedAttribute)!;
+			AttachedAttribute attachedAttribute = (AttachedAttribute)Attribute!;
 			if (attachedAttribute.Children)
 			{
 				options = target.GetComponentsInChildren(componentType);
@@ -64,12 +68,7 @@ namespace NAF.Inspector.Editor
 				UpdateElement(property);
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
-		{
-			return EditorGUI.GetPropertyHeight(property, label);
-		}
-
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			if (property.isArray)
 				DrawArray(position, property, label);
@@ -79,12 +78,12 @@ namespace NAF.Inspector.Editor
 
 		#region Element Drawing
 
-		private void UpdateElement(SerializedProperty property)
+		private void UpdateElement(in SerializedProperty property)
 		{
 			if (_options == null)
 			{
-				((AttachedAttribute)attribute).Style ??= EditorStyles.helpBox;
-				base.TryUpdate(property); // Sets the missing style and content
+				((AttachedAttribute)Attribute!).Style ??= EditorStyles.helpBox;
+				base.OnUpdate(property); // Sets the missing style and content
 				return;
 			}
 	
@@ -94,7 +93,7 @@ namespace NAF.Inspector.Editor
 
 		private void DrawElement(Rect position, SerializedProperty property, GUIContent label)
 		{
-			AttachedAttribute attachedAttribute = (attribute as AttachedAttribute)!;
+			AttachedAttribute attachedAttribute = (AttachedAttribute)Attribute!;
 			if (_options == null)
 			{
 				GUIContent multiContent = TempUtility.Content(DropdownButtonContent.text, DropdownButtonContent.image, null);
@@ -121,7 +120,7 @@ namespace NAF.Inspector.Editor
 		{
 			TreeMenu menu = TreeMenu.New();
 			Transform transform = (property.serializedObject.targetObject as Component)!.transform;
-			string typeName = fieldInfo.FieldType.Name;
+			string typeName = FieldInfo!.FieldType.Name;
 
 			menu.AddItem(TreeMenu.Item.FromTransformHierarchy(transform, Convert)!);
 
@@ -145,7 +144,7 @@ namespace NAF.Inspector.Editor
 
 			TreeMenu.Item Convert(Transform child)
 			{
-				Component[] components = child.GetComponents(fieldInfo.FieldType);
+				Component[] components = child.GetComponents(FieldInfo.FieldType);
 				TreeMenu.Item item;
 				GUIContent content;
 
@@ -178,22 +177,22 @@ namespace NAF.Inspector.Editor
 
 		#region Array Drawing
 
-		private void UpdateArray(SerializedProperty property)
+		private void UpdateArray(in SerializedProperty property)
 		{
-			if (_options == null) return;
-			var options = _options;
+			if (_options == null)
+				return;
 
-			bool invalid = options.Length != property.arraySize;
+			bool invalid = _options.Length != property.arraySize;
 			if (!invalid)
 			{
 				SerializedProperty iterator = property.Copy();
 				iterator.Next(true); // .Array
 				iterator.Next(true); // .Array.size
 
-				for (int i = 0; i < options.Length; i++)
+				for (int i = 0; i < _options.Length; i++)
 				{
 					iterator.Next(false);
-					if (options[i] != iterator.objectReferenceValue)
+					if (_options[i] != iterator.objectReferenceValue)
 					{
 						invalid = true;
 						break;
@@ -204,7 +203,7 @@ namespace NAF.Inspector.Editor
 			if (invalid)
 			{
 				property.ClearArray();
-				for (int i = 0; i < options.Length; i++)
+				for (int i = 0; i < _options.Length; i++)
 				{
 					property.InsertArrayElementAtIndex(i);
 				}
@@ -213,10 +212,10 @@ namespace NAF.Inspector.Editor
 				iterator.Next(true); // .Array
 				iterator.Next(true); // .Array.size
 
-				for (int i = 0; i < options.Length; i++)
+				for (int i = 0; i < _options.Length; i++)
 				{
 					iterator.Next(false);
-					iterator.objectReferenceValue = options[i];
+					iterator.objectReferenceValue = _options[i];
 				}
 			}
 		}
@@ -224,7 +223,7 @@ namespace NAF.Inspector.Editor
 		private void DrawArray(Rect position, SerializedProperty property, GUIContent label)
 		{
 			using (DisabledScope.True)
-				EditorGUI.PropertyField(position, property, label, true);
+				base.OnGUI(position, property, label);
 		}
 
 		#endregion

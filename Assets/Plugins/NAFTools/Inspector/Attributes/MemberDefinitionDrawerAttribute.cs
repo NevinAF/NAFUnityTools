@@ -19,9 +19,14 @@ namespace NAF.Inspector
 		public bool DrawOnElements => false;
 		public bool DrawOnField => true;
 
+		// TODO
+		// public string? Member { get; set; }
+		// public BindingFlags? ExpandFlags { get; set; }
+
 		public MemberDefinitionDrawerAttribute()
 		{
-			order = int.MinValue;
+			order = int.MinValue + 2;
+			// Member = member;
 		}
 	}
 }

@@ -7,6 +7,8 @@ namespace NAF.Inspector.Editor
 	using UnityEditor;
 	using UnityEngine;
 
+	#nullable enable
+
 	public static class AttributeEvaluator
 	{
 		public static Task Load(IConditionalAttribute conditional, in UnityEditor.SerializedProperty property)
@@ -60,6 +62,7 @@ namespace NAF.Inspector.Editor
 			string? label = sameLabels ? results[0] : "--*";
 
 			results = PropertyEvaluationCache<string>.ResolveAll(property, content.Icon);
+			
 			bool sameIcons = results.Length > 0 && TempUtility.AllEqual(results);
 			Texture? icon = sameIcons ? TempUtility.EditorTexture(results[0]) : null;
 

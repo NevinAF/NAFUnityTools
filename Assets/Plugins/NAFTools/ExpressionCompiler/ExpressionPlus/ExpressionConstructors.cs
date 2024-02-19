@@ -22,47 +22,25 @@ namespace NAF.ExpressionCompiler
 		static ExpressionConstructors()
 		{
 			Assembly assembly = Assembly.GetAssembly(typeof(Expression))!;
-			UnaryConstructor = (Func<ExpressionType, Expression, Type, MethodInfo?, UnaryExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.UnaryExpression")!,
-					new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Type), typeof(MethodInfo) },
-					typeof(Func<ExpressionType, Expression, Type, MethodInfo?, UnaryExpression>)
-				);
+			BindingFlags nonPublic = BindingFlags.NonPublic | BindingFlags.Instance;
 
-			LogicalBinaryConstructor = (Func<ExpressionType, Expression, Expression, BinaryExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.LogicalBinaryExpression")!,
-					new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression) },
-					typeof(Func<ExpressionType, Expression, Expression, BinaryExpression>)
-				);
+			ConstructorInfo unaryCI = typeof(UnaryExpression).GetConstructor(nonPublic, null, new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Type), typeof(MethodInfo) }, null)!;
+			EmitUtils.BoxedMember(unaryCI, out UnaryConstructor);
+			
+			ConstructorInfo logicalBinaryCI = assembly.GetType("System.Linq.Expressions.LogicalBinaryExpression")!.GetConstructor(nonPublic, null, new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression) }, null)!;
+			EmitUtils.BoxedMember(logicalBinaryCI, out LogicalBinaryConstructor);
 
-			AssignBinaryConstructor = (Func<Expression, Expression, BinaryExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.AssignBinaryExpression")!,
-					new Type[] { typeof(Expression), typeof(Expression) },
-					typeof(Func<Expression, Expression, BinaryExpression>)
-				);
+			ConstructorInfo assignBinaryCI = assembly.GetType("System.Linq.Expressions.AssignBinaryExpression")!.GetConstructor(nonPublic, null, new Type[] { typeof(Expression), typeof(Expression) }, null)!;
+			EmitUtils.BoxedMember(assignBinaryCI, out AssignBinaryConstructor);
 
-			MethodBinaryConstructor = (Func<ExpressionType, Expression, Expression, Type, MethodInfo, BinaryExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.MethodBinaryExpression")!,
-					new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression), typeof(Type), typeof(MethodInfo) },
-					typeof(Func<ExpressionType, Expression, Expression, Type, MethodInfo, BinaryExpression>)
-				);
+			ConstructorInfo methodBinaryCI = assembly.GetType("System.Linq.Expressions.MethodBinaryExpression")!.GetConstructor(nonPublic, null, new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression), typeof(Type), typeof(MethodInfo) }, null)!;
+			EmitUtils.BoxedMember(methodBinaryCI, out MethodBinaryConstructor);
 
-			SimpleBinaryConstructor = (Func<ExpressionType, Expression, Expression, Type, BinaryExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.SimpleBinaryExpression")!,
-					new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression), typeof(Type) },
-					typeof(Func<ExpressionType, Expression, Expression, Type, BinaryExpression>)
-				);
+			ConstructorInfo simpleBinaryCI = assembly.GetType("System.Linq.Expressions.SimpleBinaryExpression")!.GetConstructor(nonPublic, null, new Type[] { typeof(ExpressionType), typeof(Expression), typeof(Expression), typeof(Type) }, null)!;
+			EmitUtils.BoxedMember(simpleBinaryCI, out SimpleBinaryConstructor);
 
-			FullConditionalConstructor = (Func<Expression, Expression, Expression, ConditionalExpression>)
-				EmitUtils.CreateConstructor(
-					assembly.GetType("System.Linq.Expressions.FullConditionalExpression")!,
-					new Type[] { typeof(Expression), typeof(Expression), typeof(Expression) },
-					typeof(Func<Expression, Expression, Expression, ConditionalExpression>)
-				);
+			ConstructorInfo fullConditionalCI = assembly.GetType("System.Linq.Expressions.FullConditionalExpression")!.GetConstructor(nonPublic, null, new Type[] { typeof(Expression), typeof(Expression), typeof(Expression) }, null)!;
+			EmitUtils.BoxedMember(fullConditionalCI, out FullConditionalConstructor);
 		}
 	}
 }

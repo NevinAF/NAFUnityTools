@@ -5,32 +5,41 @@ namespace NAF.Inspector.Editor
 	using UnityEngine;
 
 	[CustomPropertyDrawer(typeof(SNullable<>))]
-	public class NullablePropertyDrawer : NAFPropertyDrawer
+	public class NullablePropertyDrawer : PropertyDrawer
 	{
-		public override float TryGetHeight(SerializedProperty property,
-												GUIContent label)
+		public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
 		{
-			SerializedProperty valueProperty = property.FindPropertyRelative("value");
-			return EditorGUI.GetPropertyHeight(valueProperty, label);
+			// hasValue
+			property.NextVisible(true);
+			// value
+			property.NextVisible(false);
+
+			float result = EditorGUI.GetPropertyHeight(property, label, true);
+
+			property.NextVisible(false); // end.
+
+			return result;
 		}
 
-		public override void TryOnGUI(Rect position,
-								SerializedProperty property,
-								GUIContent label)
+		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
 			// Adds a toggle button to the right of the value property. Value property draws like normal
 
-			SerializedProperty hasValueProperty = property.FindPropertyRelative("hasValue");
-			SerializedProperty valueProperty = property.FindPropertyRelative("value");
+			// hasValue
+			property.NextVisible(true);
+			bool hasValue = InlineGUI.InlineToggle(ref position, property);
 
-			bool hasValue = InlineGUI.InlineToggle(ref position, hasValueProperty);
+			// value
+			property.NextVisible(false);
 
 			bool guiEnabled = GUI.enabled;
 			GUI.enabled = hasValue && guiEnabled;
 
-			EditorGUI.PropertyField(position, valueProperty, label, true);
+			EditorGUI.PropertyField(position, property, label, true);
 
 			GUI.enabled = guiEnabled;
+
+			property.NextVisible(false); // end.
 		}
 	}
 }

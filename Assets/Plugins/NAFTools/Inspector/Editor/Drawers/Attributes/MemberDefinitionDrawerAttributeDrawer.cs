@@ -6,6 +6,7 @@ namespace NAF.Inspector.Editor
 	using UnityEditor;
 	using UnityEngine;
 	using NAF.ExpressionCompiler;
+	using System.Threading.Tasks;
 
 	[CustomPropertyDrawer(typeof(MemberDefinitionDrawerAttribute))]
 	public class MemberDefinitionDrawerAttributeDrawer : NAFPropertyDrawer
@@ -17,11 +18,10 @@ namespace NAF.Inspector.Editor
 			TwoColumn
 		}
 
-		public static DrawType CurrentDrawType = DrawType.TwoColumn;
+		public static DrawType CurrentDrawType = DrawType.Inline;
 		public const float ExpandedScalar = 0.4f;
 
-		private static MemberColorizer _colorizer;
-		private static MemberColorizer Colorizer => _colorizer ??= new UnityMemberColorizer(typeof(MemberDefinitionDrawerAttribute), typeof(HeaderAttribute), typeof(SpaceAttribute), typeof(DebuggerBrowsableAttribute));
+		private static readonly ObjectPool<MemberColorizer> _colorizerPool = new ObjectPool<MemberColorizer>(() => new UnityMemberColorizer(typeof(MemberDefinitionDrawerAttribute), typeof(DebuggerBrowsableAttribute)));
 
 		private static GUIStyle _hoverStyle;
 		private static GUIStyle HoverStyle => _hoverStyle ??= new GUIStyle(EditorStyles.label)
@@ -47,11 +47,27 @@ namespace NAF.Inspector.Editor
 		public const string CopyIcon = EditorIcons.Clipboard;
 
 		private MemberColorizer.Result? colorized;
+		protected override Task OnEnable(in SerializedProperty property)
+		{
+			MemberInfo member = Member(property);
+
+			if (member.Name.StartsWith("__") && member.Name.EndsWith("__"))
+			{
+				colorized = null;
+				return Task.CompletedTask;
+			}
+
+			return Task.Run(() => {
+				MemberColorizer mc = _colorizerPool.Get();
+				colorized = mc.DeclarationContent(member);
+				_colorizerPool.Return(mc);
+			});
+		}
 
 		private MemberInfo Member(SerializedProperty property)
 		{
-			if (fieldInfo != null)
-				return fieldInfo;
+			if (FieldInfo != null)
+				return FieldInfo;
 
 			if (property.name == "m_Script")
 				return property.serializedObject.targetObject.GetType();
@@ -59,14 +75,13 @@ namespace NAF.Inspector.Editor
 			return null;
 		}
 
-		public override void TryOnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			if (property.depth > 0 || CurrentDrawType == DrawType.No)
+			if (property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
 			{
-				EditorGUI.PropertyField(position, property, label, true);
+				base.OnGUI(position, property, label);
 				return;
 			}
-			colorized ??= Colorizer.DeclarationContent(Member(property));
 
 			Rect definitionRect = position;
 			bool copied;
@@ -74,17 +89,16 @@ namespace NAF.Inspector.Editor
 			if (CurrentDrawType == DrawType.TwoColumn)
 			{
 				Rect totalRect = position;
-				totalRect.width = EditorGUIUtility.currentViewWidth;
+				totalRect.width = EditorGUIUtility.currentViewWidth / ExpandedScalar;
 				bool hovered = totalRect.Contains(Event.current.mousePosition);
 
-				float propHeight = EditorGUI.GetPropertyHeight(property, label);
 
-				definitionRect.x += EditorGUIUtility.currentViewWidth * ExpandedScalar + EditorGUIUtility.standardVerticalSpacing;
-				definitionRect.width = EditorGUIUtility.currentViewWidth - definitionRect.x - EditorGUIUtility.standardVerticalSpacing;
+				definitionRect.x += EditorGUIUtility.currentViewWidth + EditorGUIUtility.standardVerticalSpacing;
+				definitionRect.width = totalRect.width - definitionRect.x - EditorGUIUtility.standardVerticalSpacing;
 				definitionRect.height = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
-				position.height = propHeight;
-				EditorGUI.PropertyField(position, property, label, true);
+				// position.height = propHeight;
+				base.OnGUI(position, property, label);
 
 
 				using (DisabledScope.False)
@@ -97,7 +111,7 @@ namespace NAF.Inspector.Editor
 				definitionRect.height = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
 				position.yMin += definitionRect.height + EditorGUIUtility.standardVerticalSpacing;
-				EditorGUI.PropertyField(position, property, label, true);
+				base.OnGUI(position, property, label);
 
 				using (DisabledScope.False)
 					copied = GUI.Button(definitionRect, TempUtility.Content(colorized.Value.RichText), hovered ? HoverStyle : NormalStyle);
@@ -122,18 +136,15 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		public override float TryGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
 		{
-			if (property.depth > 0 || CurrentDrawType == DrawType.No)
-				return EditorGUI.GetPropertyHeight(property, label, property.isExpanded);
+			if (property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
+				return base.OnGetHeight(property, label);
 
-			colorized ??= Colorizer.DeclarationContent(Member(property));
-
-
-			float prop = EditorGUI.GetPropertyHeight(property, label, property.isExpanded);
+			float prop = base.OnGetHeight(property, label);
 			float drawer = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
-			float spacing = property.NextVisible(false) ? EditorGUIUtility.standardVerticalSpacing * 1.5f : 0f;
+			float spacing = UnityInternals.SerializedProperty_isValid(property) ? EditorGUIUtility.standardVerticalSpacing * 1.5f : 0f;
 
 			if (CurrentDrawType == DrawType.TwoColumn)
 				return Mathf.Max(prop, drawer) + spacing;

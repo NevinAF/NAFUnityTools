@@ -6,30 +6,37 @@ namespace NAF.Samples.Editor
 	using NAF.Inspector.Editor;
 
 	using MemberDrawer = NAF.Inspector.Editor.MemberDefinitionDrawerAttributeDrawer;
+	using System.Collections.Generic;
 
 	// // Draws all array properties with a custom drawer, everything else is drawn normally
 	[CanEditMultipleObjects]
 	[CustomEditor(typeof(NAFSampleBehaviour), true)]
 	public class NAFSampleInspector : ArrayDrawer
 	{
-		protected override PropertyAttribute[] GetAdditionalDrawers() => new PropertyAttribute[] { new MemberDefinitionDrawerAttribute() };
+		public static MemberDrawer.DrawType DrawType = MemberDrawer.DrawType.TwoColumn;
 
 		public override void OnInspectorGUI()
 		{
-			MemberDrawer.CurrentDrawType = (MemberDrawer.DrawType)EditorGUILayout.EnumPopup("Show Definitions?", MemberDrawer.CurrentDrawType);
+			DrawType = (MemberDrawer.DrawType)EditorGUILayout.EnumPopup("Show Definitions?", DrawType);
 			EditorGUILayout.Space();
 
-			if (MemberDrawer.CurrentDrawType == MemberDrawer.DrawType.TwoColumn)
+			var previousDraw = MemberDrawer.CurrentDrawType;
+			MemberDrawer.CurrentDrawType = DrawType;
+
+			if (DrawType == MemberDrawer.DrawType.TwoColumn)
 			{
-				EditorGUILayout.BeginVertical(GUILayout.Width(EditorGUIUtility.currentViewWidth * MemberDrawer.ExpandedScalar));
-				EditorGUIUtility.labelWidth = Mathf.Max(EditorGUIUtility.currentViewWidth * 0.45f * MemberDrawer.ExpandedScalar - 40f, 120f);
+				float previous = UnityInternals.EditorGUIUtility_s_OverriddenViewWidth;
+				UnityInternals.EditorGUIUtility_s_OverriddenViewWidth = EditorGUIUtility.currentViewWidth * MemberDrawer.ExpandedScalar;
+				EditorGUILayout.BeginVertical(GUILayout.Width(EditorGUIUtility.currentViewWidth));
 				base.OnInspectorGUI();
-				EditorGUIUtility.labelWidth = 0f;
 				GUILayout.EndVertical();
+				UnityInternals.EditorGUIUtility_s_OverriddenViewWidth = previous;
 			}
 			else {
 				base.OnInspectorGUI();
 			}
+
+			MemberDrawer.CurrentDrawType = previousDraw;
 		}
 	}
 }

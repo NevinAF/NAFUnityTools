@@ -7,191 +7,167 @@ namespace NAF.ExpressionCompiler
 {
 	public static class EmitUtils
 	{
-		public static Delegate CreateConstructor(Type type, Type[] parameterTypes, Type asFuncType)
+		private static void UnboxIfNeeded(ILGenerator il, Type current, Type target)
 		{
-			if (type == null)
-				throw new ArgumentNullException(nameof(type));
-
-			parameterTypes ??= Type.EmptyTypes;
-
-			if (asFuncType == null)
+			if (current != target)
 			{
-				Type[] parameterTypesPlusOne = new Type[parameterTypes.Length + 1];
-				parameterTypes.CopyTo(parameterTypesPlusOne, 0);
-				parameterTypesPlusOne[parameterTypes.Length] = type;
-				asFuncType = Expression.GetFuncType(parameterTypesPlusOne);
+				if (target.IsValueType)
+				{
+					if (current != typeof(object))
+						throw new ArgumentException("Cannot unbox (parameter) to a value type from a non-object type: " + current.Name + " to " + target.Name);
+
+					il.Emit(OpCodes.Unbox_Any, target);
+				}
+				else {
+					if (!current.IsAssignableFrom(target))
+						throw new ArgumentException("Cannot cast (parameter) to a non-compatible type: " + current.Name + " to " + target.Name);
+					il.Emit(OpCodes.Castclass, target);
+				}
+			}
+		}
+
+		private static void BoxIfNeeded(ILGenerator il, Type current, Type target)
+		{
+			if (current != target)
+			{
+				if (current.IsValueType)
+				{
+					if (target != typeof(object))
+						throw new ArgumentException("Cannot box (return) to a non-object type: " + current.Name + " to " + target.Name);
+				}
+				else
+				{
+					if (!target.IsAssignableFrom(current))
+						throw new ArgumentException("Cannot cast (return) to a non-compatible type: " + current.Name + " to " + target.Name);
+
+					il.Emit(OpCodes.Castclass, target);
+				}
+			}
+		}
+
+		private static void EmitMethodCall(ILGenerator il, MethodBase method, Type[] funcParameters, Type funcReturnType)
+		{
+			ParameterInfo[] parameters = method.GetParameters();
+			int funcIndex = 0;
+
+			if (!method.IsStatic && !method.IsConstructor)
+			{
+				funcIndex = 1;
+				il.Emit(OpCodes.Ldarg_0);
+				UnboxIfNeeded(il, funcParameters[0], method.DeclaringType);
 			}
 
-			DynamicMethod dm = new DynamicMethod("ctor", type, parameterTypes, type, true);
-			ILGenerator il = dm.GetILGenerator();
+			if (funcIndex + parameters.Length != funcParameters.Length)
+				throw new ArgumentException("Invalid number of parameters");
 
-			ConstructorInfo ctor = type.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, parameterTypes, null) ??
-				throw new ArgumentException("No constructor found matching the specified arguments");
+			for (int i = 0; i < parameters.Length; i++, funcIndex++)
+			{
+				il.Emit(OpCodes.Ldarg, funcIndex);
+				UnboxIfNeeded(il, funcParameters[funcIndex], parameters[i].ParameterType);
+			}
 
-			for (int i = 0; i < parameterTypes.Length; i++)
-				il.Emit(OpCodes.Ldarg, i);
+			if (method.IsConstructor)
+			{
+				il.Emit(OpCodes.Newobj, (ConstructorInfo)method);
+				BoxIfNeeded(il, method.DeclaringType, funcReturnType);
+			}
+			else
+			{
+				MethodInfo methodInfo = (MethodInfo)method;
+				il.Emit(OpCodes.Call, methodInfo);
 
-			il.Emit(OpCodes.Newobj, ctor);
-			il.Emit(OpCodes.Ret);
-
-			return dm.CreateDelegate(asFuncType);
+				if (funcReturnType != typeof(void))
+				{
+					BoxIfNeeded(il, methodInfo.ReturnType, funcReturnType);
+				}
+			}
 		}
 
-		public static Delegate FieldSetter(Type type, string fieldName)
+		public static void BoxedMember<T>(MemberInfo member, out T result) where T : MulticastDelegate
 		{
-			if (type == null)
-				throw new ArgumentNullException(nameof(type));
-
-			if (fieldName == null)
-				throw new ArgumentNullException(nameof(fieldName));
-
-			FieldInfo field = type.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic) ??
-				throw new ArgumentException("No field found matching the specified name");
-
-
-			DynamicMethod dm = new DynamicMethod("setter", null, new Type[] { type, field.FieldType }, type, true);
-			ILGenerator il = dm.GetILGenerator();
-
-			il.Emit(OpCodes.Ldarg_0);
-			il.Emit(OpCodes.Ldarg_1);
-			il.Emit(OpCodes.Stfld, field);
-			il.Emit(OpCodes.Ret);
-
-			var asFuncType = Expression.GetFuncType(type, field.FieldType);
-			return dm.CreateDelegate(asFuncType);
+			result = BoxedMember<T>(member);
 		}
 
-		// public static Delegate GetFieldGetter(Type type, FieldInfo field, Type asFuncType)
-		// {
-		// 	if (type == null)
-		// 		throw new ArgumentNullException(nameof(type));
+		public static T BoxedMember<T>(MemberInfo member) where T : MulticastDelegate
+		{
+			MethodInfo funcSignature = typeof(T).GetMethod("Invoke");
 
-		// 	if (field == null)
-		// 		throw new ArgumentNullException(nameof(field));
+			ParameterInfo[] funcParamInfos = funcSignature.GetParametersCached();
+			Type[] funcParams = new Type[funcParamInfos.Length];
+			for (int i = 0; i < funcParamInfos.Length; i++)
+				funcParams[i] = funcParamInfos[i].ParameterType;
+			Type funcReturnType = funcSignature.ReturnType;
 
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(type, field.FieldType);
+			DynamicMethod dynamicMethod = new DynamicMethod("Member", funcReturnType, funcParams, typeof(EmitUtils), true);
+			ILGenerator il = dynamicMethod.GetILGenerator();
 
-		// 	DynamicMethod dm = new DynamicMethod("getter", field.FieldType, new Type[] { type }, type, true);
-		// 	ILGenerator il = dm.GetILGenerator();
+			switch (member.MemberType)
+			{
+				case MemberTypes.Constructor:
+					EmitMethodCall(il, (ConstructorInfo)member, funcParams, funcReturnType);
+					break;
+				case MemberTypes.Method:
+					EmitMethodCall(il, (MethodInfo)member, funcParams, funcReturnType);
+					break;
+				case MemberTypes.Property:
+					PropertyInfo property = (PropertyInfo)member;
+					if (funcReturnType != typeof(void))
+					{
+						if (property.CanRead)
+							EmitMethodCall(il, property.GetGetMethod(), funcParams, funcReturnType);
+						else
+							throw new ArgumentException("Property has no getter");
+					}
+					else
+					{
+						if (property.CanWrite)
+							EmitMethodCall(il, property.GetSetMethod(), funcParams, funcReturnType);
+						else
+							throw new ArgumentException("Property has no setter");
+					}
+					break;
+				case MemberTypes.Field:
+					FieldInfo field = (FieldInfo)member;
+					bool isStatic = field.IsStatic;
+					if (funcReturnType != typeof(void))
+					{
+						if (isStatic)
+							il.Emit(OpCodes.Ldsfld, field);
+						else
+						{
+							il.Emit(OpCodes.Ldarg_0);
+							UnboxIfNeeded(il, funcParams[0], field.DeclaringType);
+							il.Emit(OpCodes.Ldfld, field);
+						}
+						BoxIfNeeded(il, field.FieldType, funcReturnType);
+					}
+					else
+					{
+						if (isStatic)
+						{
+							il.Emit(OpCodes.Ldarg_0);
+							UnboxIfNeeded(il, funcParams[0], field.FieldType);
+							il.Emit(OpCodes.Stsfld, field);
+						}
+						else
+						{
+							il.Emit(OpCodes.Ldarg_0);
+							UnboxIfNeeded(il, funcParams[0], field.DeclaringType);
+							il.Emit(OpCodes.Ldarg_1);
+							UnboxIfNeeded(il, funcParams[1], field.FieldType);
+							il.Emit(OpCodes.Stfld, field);
+						}
+					}
+					break;
+				default:
+					throw new ArgumentException("Member is not a field, property or method");
+			}
 
-		// 	il.Emit(OpCodes.Ldarg_0);
-		// 	il.Emit(OpCodes.Ldfld, field);
-		// 	il.Emit(OpCodes.Ret);
+			il.Emit(OpCodes.Ret);
 
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
+			// Create the delegate
+			return (T)dynamicMethod.CreateDelegate(typeof(T));
+		}
 
-		// public static Delegate GetMethod(Type type, MethodInfo method, Type asFuncType)
-		// {
-		// 	if (type == null)
-		// 		throw new ArgumentNullException(nameof(type));
-
-		// 	if (method == null)
-		// 		throw new ArgumentNullException(nameof(method));
-
-		// 	ParameterInfo[] parameters = method.GetParametersCached();
-		// 	Type[] parameterTypes = new Type[parameters.Length + 1];
-
-		// 	parameterTypes[0] = type;
-		// 	for (int i = 0; i < parameters.Length; i++)
-		// 		parameterTypes[i + 1] = parameters[i].ParameterType;
-
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(parameterTypes);
-
-		// 	DynamicMethod dm = new DynamicMethod("method", method.ReturnType, parameterTypes, type, true);
-		// 	ILGenerator il = dm.GetILGenerator();
-
-		// 	il.Emit(OpCodes.Ldarg_0);
-		// 	for (int i = 0; i < method.GetParameters().Length; i++)
-		// 		il.Emit(OpCodes.Ldarg, i + 1);
-
-		// 	il.Emit(OpCodes.Call, method);
-		// 	il.Emit(OpCodes.Ret);
-
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
-
-		// public static Delegate GetPropertyGetter(Type type, PropertyInfo property, Type asFuncType)
-		// {
-		// 	if (type == null)
-		// 		throw new ArgumentNullException(nameof(type));
-
-		// 	if (property == null)
-		// 		throw new ArgumentNullException(nameof(property));
-
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(type, property.PropertyType);
-
-		// 	DynamicMethod dm = new DynamicMethod("getter", property.PropertyType, new Type[] { type }, type, true);
-		// 	ILGenerator il = dm.GetILGenerator();
-
-		// 	il.Emit(OpCodes.Ldarg_0);
-		// 	il.Emit(OpCodes.Call, property.GetGetMethod(true));
-		// 	il.Emit(OpCodes.Ret);
-
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
-
-		// public static Delegate GetFieldGetter(FieldInfo staticField, Type asFuncType)
-		// {
-		// 	if (staticField == null)
-		// 		throw new ArgumentNullException(nameof(staticField));
-
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(staticField.FieldType);
-
-		// 	DynamicMethod dm = new DynamicMethod("getter", staticField.FieldType, Type.EmptyTypes, staticField.DeclaringType, true);
-		// 	ILGenerator il = dm.GetILGenerator();
-
-		// 	il.Emit(OpCodes.Ldsfld, staticField);
-		// 	il.Emit(OpCodes.Ret);
-
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
-
-		// public static Delegate GetMethod(MethodInfo staticMethod, Type asFuncType)
-		// {
-		// 	if (staticMethod == null)
-		// 		throw new ArgumentNullException(nameof(staticMethod));
-
-		// 	ParameterInfo[] parameters = staticMethod.GetParametersCached();
-		// 	Type[] parameterTypes = new Type[parameters.Length];
-
-		// 	for (int i = 0; i < parameters.Length; i++)
-		// 		parameterTypes[i] = parameters[i].ParameterType;
-
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(parameterTypes);
-
-		// 	DynamicMethod dm = new DynamicMethod("method", staticMethod.ReturnType, parameterTypes, staticMethod.DeclaringType, true);
-		// 	ILGenerator il = dm.GetILGenerator();
-
-		// 	for (int i = 0; i < parameters.Length; i++)
-		// 		il.Emit(OpCodes.Ldarg, i);
-
-		// 	il.Emit(OpCodes.Call, staticMethod);
-		// 	il.Emit(OpCodes.Ret);
-
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
-
-		// public static Delegate GetPropertyGetter(PropertyInfo staticProperty, Type asFuncType)
-		// {
-		// 	if (staticProperty == null)
-		// 		throw new ArgumentNullException(nameof(staticProperty));
-
-		// 	if (asFuncType == null)
-		// 		asFuncType = Expression.GetFuncType(staticProperty.PropertyType);
-
-		// 	DynamicMethod dm = new DynamicMethod("getter", staticProperty.PropertyType, Type.EmptyTypes, staticProperty.DeclaringType, true);
-		// 	ILGenerator il = dm.GetILGenerator();
-
-		// 	il.Emit(OpCodes.Call, staticProperty.GetGetMethod(true));
-		// 	il.Emit(OpCodes.Ret);
-
-		// 	return dm.CreateDelegate(asFuncType);
-		// }
 	}
 }
