@@ -7,6 +7,7 @@ namespace NAF.Inspector.Editor
 	public class NAFSpaceDrawer : NAFPropertyDrawer
 	{
 		private float Size => ((SpaceAttribute)Attribute).height;
+		public override bool OnlyDrawWithEditor => true;
 
 		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
@@ -27,6 +28,7 @@ namespace NAF.Inspector.Editor
 	public class NAFHeaderDrawer : NAFPropertyDrawer
 	{
 		private string Header => ((HeaderAttribute)Attribute).header;
+		public override bool OnlyDrawWithEditor => true;
 
 		private float Height()
 		{

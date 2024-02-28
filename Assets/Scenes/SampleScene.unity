@@ -277,21 +277,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 40096afc9deb45b4fad6672247bd2cf6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  __Title__: 0
   StringLabel: 1234
   StringLabelWithTooltip: Hello World
   IconLabel: 1
   FullStringContentLabel: 0
+  __Styling__: 0
   BoldLabel: 5.43
   HelpBoxLabel: 3.14
   CustomStyleLabel: 3.14
+  __Alignment__: 0
   LeftLabel: {x: -1, y: 0, z: 0}
   BetweenLeftLabel: 116
   BetweenRightLabel: 3.14
   RightLabel: {x: 1, y: 0}
+  __Arrays__: 0
   LeftLabelArray: 
   BetweenLeftLabelArray: 
   BetweenRightLabelArray: 000000
   RightLabelArray: 
+  __PrefixSuffix__: 0
   SuffixLabel:
     serializedVersion: 2
     m_Curve:
@@ -317,6 +322,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   PrefixLabel: {r: 0, g: 1, b: 0, a: 1}
+  __Dynamic__: 0
   RoundedLabel: 7.62
   PrefixedValueName: {fileID: 705507993}
   IconSwap: 0
@@ -457,21 +463,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82f1a523a4777524d9aaa8c1cf9f7637, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  __Title__: 0
   Toggle: 1
   Target: {fileID: 0}
+  __BasicValidate__: 0
   Positive: 45
   LessThan24Chars: Hello World
   MagnitudeGreaterThanEpsilon: {x: 0, y: 0}
   OneIsNaN: {x: 1, y: 3}
   NotNullWhenToggle: {fileID: 0}
+  __LabelsIcons__: 0
   ArrayNotEmptyWarning: 
   NotOnTarget: {fileID: 705507995}
+  __Styles__: 0
   OnWithoutObject: 0
   WithNAFSampleBehaviour: {fileID: 0}
+  __Required__: 0
   RequiredObject: {fileID: 0}
   RequiredMask:
     serializedVersion: 2
     m_Bits: 0
+  RequiredSeconds: 0
 --- !u!4 &1736804882
 Transform:
   m_ObjectHideFlags: 0
@@ -532,10 +544,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 33ed8e3cc0ddb9f47a4b7e8503f45ae6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  __Title__: 0
   number: 36
   vector2: {x: 0, y: 0}
   gameobject: {fileID: 0}
   text: Normal Text!
+  __Readonly__: 0
   ReadonlyConstantField: 1234
   <HalfNumberProperty>k__BackingField: 12
   GameObjectTransform: {fileID: 0}
@@ -550,6 +564,7 @@ MonoBehaviour:
   - F
   - G
   - H
+  __DisableIf__: 0
   Gameobject_Is_Set: 3.14
   Vector2_X_Greater_Y: 9.85
   Text_Is_Normal: 6.28
@@ -562,6 +577,7 @@ MonoBehaviour:
   - F
   - G
   - H
+  __EnableIf__: 0
   Gameobject_Is_Active: Enabled if the gameobject active.
   Number_Is_Square: Enabled if the number is a perfect square.
   Vector2_X_Not_Multiple_Of_Y: Enabled if the x of the vector is not a multiple of
@@ -595,6 +611,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 430b0e85897ec574fa316fe0d95648ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  __Title__: 0
   TimeInSeconds: 12.34
   DistanceInMeters: 2390300
   MassInTons: 255

@@ -1,4 +1,3 @@
-#define NAF_DEBUG
 
 namespace NAF.Inspector.Editor
 {
@@ -17,6 +16,7 @@ namespace NAF.Inspector.Editor
 	using UnityEditor.Overlays;
 	using System.Runtime.Remoting.Messaging;
 	using System.Linq;
+	using System.Collections.Concurrent;
 
 #nullable enable
 
@@ -105,6 +105,24 @@ namespace NAF.Inspector.Editor
 
 	public class PropertyTree
 	{
+		public static class AttributeListBag
+		{
+			public static ConcurrentBag<List<PropertyAttribute>> Bag = new ConcurrentBag<List<PropertyAttribute>>();
+
+			public static List<PropertyAttribute> Get()
+			{
+				if (Bag.TryTake(out var list))
+					return list;
+				return new List<PropertyAttribute>();
+			}
+
+			public static void Return(List<PropertyAttribute> list)
+			{
+				list.Clear();
+				Bag.Add(list);
+			}
+		}
+
 		public readonly static GUIContent _currentLabel = new GUIContent();
 
 		private enum ExceptionLocation
@@ -118,60 +136,41 @@ namespace NAF.Inspector.Editor
 	#endif
 
 		private FieldInfo? _fieldInfo;
-		private ExceptionLocation _exceptionLocation;
-		private Exception? _exception;
 		private readonly List<NAFPropertyDrawer> drawers = new List<NAFPropertyDrawer>();
 		// private bool useBuiltinDrawer;
 		private object? propertyHandler;
 		private string? tooltip;
 		private readonly List<PropertyTree> children = new List<PropertyTree>();
 		private int maxDepth;
-		private ArrayDrawer? editor;
+		private ArrayDrawer? _editor;
 
 		public FieldInfo? FieldInfo => _fieldInfo;
 
-		public void PrependDrawer(NAFPropertyDrawer drawer)
+		public void AddDrawer(NAFPropertyDrawer drawer)
 		{
-			drawers.Insert(0, drawer);
+			if (drawers.Count != 0 && drawers[drawers.Count - 1].EndsDrawing)
+			{
+				UnityEngine.Debug.LogWarning("Drawer " + drawers[drawers.Count - 1].GetType().Name + " ends property drawing, but there are more drawers trying to be drawn after it: " + drawer.GetType().Name);
+			}
+
+			if (_editor == null && drawer.OnlyDrawWithEditor)
+				return;
+
+			drawers.Add(drawer);
 		}
 
-		public void Reset(in SerializedProperty property, FieldInfo? field = null, object? propertyHandlerCache = null, IEnumerable<PropertyAttribute>? extraAttributes = null)
+		public void Reset(in SerializedProperty property, ArrayDrawer? editor = null)
 		{
 		#if NAF_DEBUG
 			_pathForValidation = property.propertyPath;
 			using var _ = new Assertions.EndsSerializedProperty(property, "PropertyTree.Reset did not end with the same property.");
 		#endif
 
-			Type? propertyType;
 			bool isArrayProperty = property.isArray && property.propertyType != SerializedPropertyType.String;
-			if (field != null)
-			{
-				_fieldInfo = field;
-				propertyType = _fieldInfo.FieldType;
-				if (!isArrayProperty)
-				{
-					if (propertyType.IsArrayOrList())
-						propertyType = propertyType.GetArrayOrListElementType();
-				}
-				else if (!propertyType.IsArrayOrList())
-						throw new InvalidOperationException("FieldInfo is not an array or list but the property is an array.");
-			}
-			else {
-				_fieldInfo = UnityInternals.ScriptAttributeUtility_GetFieldInfoAndStaticTypeFromProperty(property, out propertyType);
-			}
-
-			_exceptionLocation = ExceptionLocation.None;
-			_exception = null;
-			propertyHandler = null;
-			drawers.Clear();
-			children.Clear();
-
-			editor = ArrayDrawer.Current;
+			_fieldInfo = UnityInternals.ScriptAttributeUtility_GetFieldInfoAndStaticTypeFromProperty(property, out Type? propertyType);
+			_editor = editor;
 
 			// Load Field Attributes...
-			propertyAttributesBuffer.Clear();
-			if (extraAttributes != null)
-				propertyAttributesBuffer.AddRange(extraAttributes);
 			if (_fieldInfo != null)
 			{
 				foreach (PropertyAttribute attribute in _fieldInfo.FieldType.GetCustomAttributes<PropertyAttribute>(true))
@@ -182,37 +181,22 @@ namespace NAF.Inspector.Editor
 			}
 			propertyAttributesBuffer.Sort(propertyAttributeComparer);
 
-			List<PropertyAttribute> builtinAttributes = new List<PropertyAttribute>();
-
-			
+			List<PropertyAttribute> builtinAttributes = AttributeListBag.Get();
+			NAFPropertyDrawer? drawer;
 
 			for (int i = 0; i < propertyAttributesBuffer.Count; i++)
 			{
 				PropertyAttribute attribute = propertyAttributesBuffer[i];
-				bool isArrayAttribute = false;
-				// Check if the attribute should be drawn on this property...
-				if (attribute is IArrayPropertyAttribute arrayAttribute)
-				{
-					isArrayAttribute = true;
-					if (!arrayAttribute.DrawOnElements && !arrayAttribute.DrawOnArray && !arrayAttribute.DrawOnField)
-						// TODO: Make this a drawer?
-						throw new InvalidOperationException($"Attribute {arrayAttribute.GetType().Name} extends '{nameof(IArrayPropertyAttribute)}' but does not draw on the array nor the elements.");
 
-					
-					if (property.IsElementOfArray()) {
-						if (!arrayAttribute.DrawOnElements) continue;
-					}
-					else if (isArrayProperty) {
-						if (!arrayAttribute.DrawOnArray) continue;
-					}
-					else if (!arrayAttribute.DrawOnField) continue;
-				}
+				bool useNAF = false;
+				// Check if the attribute should be drawn on this property...
+				if (attribute is IArrayPropertyAttribute aa)
+					useNAF = IArrayPropertyAttribute.DrawOnProperty(aa, property);
+				else useNAF = !isArrayProperty;
 
 				// Create Property Drawers for the attributes...
-				
-				// TODO: filter unity attributes for drawers maybe?
-				// If the handler cache is null, this is being drawn after the property handler has been drawn.
-				if (propertyHandlerCache != null)
+
+				if (_editor != null)
 				{
 					if (attribute is TooltipAttribute tooltipAttribute)
 					{
@@ -220,132 +204,35 @@ namespace NAF.Inspector.Editor
 							tooltip = tooltipAttribute.tooltip;
 						continue;
 					}
+
 					if (attribute is SpaceAttribute spaceAttribute || attribute is HeaderAttribute)
-					{
-						isArrayAttribute = true;
-					}
-				}
-				
-				NAFPropertyDrawer? drawer = null;
-
-				if (!isArrayProperty || isArrayAttribute)
-					drawer = NAFPropertyDrawer.Get(this, property, attribute.GetType(), attribute);
-
-				if (drawer != null)
-				{
-					if (propertyHandlerCache == null)
-					{
-						// Filter out built in attributes that have already been drawn..
-						if (attribute is HeaderAttribute ||
-							attribute is SpaceAttribute)
-							continue;
-					}
-
-					drawers.Add(drawer);
-					continue;
+						useNAF = true;
 				}
 
-				builtinAttributes.Add(attribute);
+				if (useNAF && NAFPropertyDrawer.TryGet(this, property, attribute.GetType(), attribute, out drawer))
+					AddDrawer(drawer);
+				else builtinAttributes.Add(attribute);
 			}
+			propertyAttributesBuffer.Clear();
 
 			// Check if this type itself has a drawer...
-			NAFPropertyDrawer? typeDrawer = NAFPropertyDrawer.Get(this, property, propertyType, null);
+			if (NAFPropertyDrawer.TryGet(this, property, propertyType, null, out drawer))
+				AddDrawer(drawer);
 
-			if (typeDrawer != null)
-			{
-				drawers.Add(typeDrawer);
-
-				// TODO: Add something stating weather a drawer is a "Final" drawer.
-				// if (useBuiltinDrawer)
-				// 	Debug.LogWarning($"Property {property.propertyPath} has built-in property attribute/drawers but uses custom type drawers. This is not supported as drawing the property attributes would require drawing the property twice.");
-			}
-
-			// Arrays always use a built in drawer
-			bool useBuiltinDrawer = false;
-			if (propertyHandlerCache != null)
-			{
-				useBuiltinDrawer = isArrayProperty;
-				bool CheckBuiltinDrawer(Type builtinDrawerType)
-				{
-					if (isArrayProperty)
-					{
-						if (!typeof(DecoratorDrawer).IsAssignableFrom(builtinDrawerType))
-							// TODO OR !propertyattibute.applytocollection
-							return false;
-					}
-
-					if (FieldInfo?.FieldType.IsArrayOrList() ?? false && !typeof(PropertyDrawer).IsAssignableFrom(builtinDrawerType))
-						return false;
-
-					return true;
-				}
-
-				if (!useBuiltinDrawer)
-				{
-					for (int i = 0; i < builtinAttributes.Count; i++)
-					{
-						PropertyAttribute attribute = builtinAttributes[i];
-						Type builtinDrawerType = UnityInternals.ScriptAttributeUtility_GetDrawerTypeForPropertyAndType(property, attribute.GetType());
-
-						if (builtinDrawerType == null)
-						{
-							// TODO: Make this a drawer?
-							Debug.LogWarning($"No drawer found for attribute {attribute.GetType().Name}.");
-							continue;
-						}
-
-						if (CheckBuiltinDrawer(builtinDrawerType))
-						{
-							useBuiltinDrawer = true;
-							break;
-						}
-					}
-				}
-
-				// See if the property itself has a drawer
-				bool useSelfDrawer = false;
-				if (propertyType != null)
-				{
-					Type builtinDrawerType = UnityInternals.ScriptAttributeUtility_GetDrawerTypeForPropertyAndType(property, propertyType);
-					if (builtinDrawerType != null && builtinDrawerType != typeof(DefaultDrawer) && CheckBuiltinDrawer(builtinDrawerType))
-					{
-						useBuiltinDrawer = true;
-						useSelfDrawer = true;
-					}
-				}
-
-				if (useBuiltinDrawer)
-				{
-					if (FieldInfo == null) throw new InvalidOperationException("FieldInfo is null!");
-
-					UnityEngine.Debug.Log($"Using builtin drawer for {FieldInfo.Name} of type {FieldInfo.FieldType.Name}. Attributes: {string.Join(", ", builtinAttributes.Select(a => a.GetType().Name))}");
-
-					propertyHandler = Activator.CreateInstance(UnityInternals.PropertyHandlerType);
-
-					for (int i = 0; i < builtinAttributes.Count; i++)
-					{
-						PropertyAttribute attribute = builtinAttributes[i];
-						UnityInternals.PropertyDrawer_HandleAttribute(propertyHandler, property, attribute, FieldInfo, FieldInfo.FieldType);
-					}
-
-					if (useSelfDrawer && propertyType != null)
-						UnityInternals.PropertyDrawer_HandleDrawnType(propertyHandler, property, propertyType, propertyType, FieldInfo, null);
-
-					UnityInternals.PropertyHandlerCache_SetHandler(propertyHandlerCache ?? UnityInternals.ScriptAttributeUtility_propertyHandlerCache, property, propertyHandler);
-				}
-			}
+			BuildPropertyHandler(property, builtinAttributes, propertyType);
+			AttributeListBag.Return(builtinAttributes);
 
 			ChangesCache.OnClear += Invalidate;
 
-			// Load Children...
-			int depth = property.depth;
-			maxDepth = depth;
-
-			if (DefaultableProperty(property) || useBuiltinDrawer)
+			if (DefaultableProperty(property) || propertyHandler != null)
 			{
 				property.NextVisible(false);
 				return;
 			}
+
+			// Load Children...
+			int depth = property.depth;
+			maxDepth = depth;
 
 			if (property.NextVisible(true))
 			{
@@ -353,7 +240,7 @@ namespace NAF.Inspector.Editor
 				{
 					PropertyTree child = PropertyCache.TreePool.Get();
 
-					child.Reset(property);
+					child.Reset(property, editor);
 					children.Add(child);
 					maxDepth = Mathf.Max(maxDepth, child.maxDepth);
 
@@ -363,11 +250,85 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
+		private void BuildPropertyHandler(SerializedProperty property, List<PropertyAttribute> builtinAttributes, Type? propertyType)
+		{
+			bool useBuiltinDrawer = false;
+			bool CheckBuiltinDrawer(Type builtinDrawerType)
+			{
+				if (property.isArray && property.propertyType != SerializedPropertyType.String)
+				{
+					if (!typeof(DecoratorDrawer).IsAssignableFrom(builtinDrawerType))
+						// TODO OR !propertyattibute.applytocollection
+						return false;
+				}
+
+				if (FieldInfo?.FieldType.IsArrayOrList() ?? false && !typeof(PropertyDrawer).IsAssignableFrom(builtinDrawerType))
+					return false;
+
+				return true;
+			}
+
+			for (int i = 0; i < builtinAttributes.Count; i++)
+			{
+				PropertyAttribute attribute = builtinAttributes[i];
+				Type builtinDrawerType = UnityInternals.ScriptAttributeUtility_GetDrawerTypeForPropertyAndType(property, attribute.GetType());
+
+				if (builtinDrawerType == null)
+				{
+					// TODO: Make this a drawer?
+					Debug.LogWarning($"No drawer found for attribute {attribute.GetType().Name}.");
+					continue;
+				}
+
+				if (CheckBuiltinDrawer(builtinDrawerType))
+				{
+					useBuiltinDrawer = true;
+					break;
+				}
+			}
+
+			// See if the property itself has a drawer
+			bool useSelfDrawer = false;
+			if (propertyType != null)
+			{
+				Type builtinDrawerType = UnityInternals.ScriptAttributeUtility_GetDrawerTypeForPropertyAndType(property, propertyType);
+				if (builtinDrawerType != null && builtinDrawerType != typeof(DefaultDrawer) && CheckBuiltinDrawer(builtinDrawerType))
+				{
+					useBuiltinDrawer = true;
+					useSelfDrawer = true;
+				}
+			}
+
+			if (!useBuiltinDrawer)
+				return;
+
+			if (FieldInfo == null) throw new InvalidOperationException("FieldInfo is null!");
+
+			UnityEngine.Debug.Log($"Using builtin drawer for {FieldInfo.Name} of type {FieldInfo.FieldType.Name}. Attributes: {string.Join(", ", builtinAttributes.Select(a => a.GetType().Name))}");
+
+			propertyHandler = Activator.CreateInstance(UnityInternals.PropertyHandlerType);
+
+			for (int i = 0; i < builtinAttributes.Count; i++)
+			{
+				PropertyAttribute attribute = builtinAttributes[i];
+				UnityInternals.PropertyDrawer_HandleAttribute(propertyHandler, property, attribute, FieldInfo, FieldInfo.FieldType);
+			}
+
+			if (useSelfDrawer && propertyType != null)
+				UnityInternals.PropertyDrawer_HandleDrawnType(propertyHandler, property, propertyType, propertyType, FieldInfo, null);
+
+			object propCache = _editor != null ?
+				UnityInternals.Editor_m_PropertyHandlerCache(_editor) :
+				UnityInternals.ScriptAttributeUtility_propertyHandlerCache;
+
+			UnityInternals.PropertyHandlerCache_SetHandler(propCache, property, propertyHandler);
+		}
+
 		public void Return()
 		{
+			ChangesCache.OnClear -= Invalidate;
+
 			_fieldInfo = null;
-			_exceptionLocation = ExceptionLocation.None;
-			_exception = null;
 			tooltip = null;
 			propertyHandler = null;
 
@@ -381,7 +342,6 @@ namespace NAF.Inspector.Editor
 
 			PropertyCache.TreePool.Return(this);
 
-			ChangesCache.OnClear -= Invalidate;
 		}
 
 		public void OnGUILayout(SerializedProperty property, params GUILayoutOption[] options)
@@ -633,14 +593,16 @@ namespace NAF.Inspector.Editor
 
 		public void Repaint()
 		{
-			if (editor != null)
-				editor.Repaint();
+			if (_editor != null)
+				_editor.Repaint();
+			else // Force the whole inspector to repaint
+				UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 		}
 
 		private static Comparer<PropertyAttribute> propertyAttributeComparer = Comparer<PropertyAttribute>.Create((p1, p2) => p1.order.CompareTo(p2.order));
 		private static List<PropertyAttribute> propertyAttributesBuffer = new List<PropertyAttribute>();
 
-		public static List<PropertyTree> BuildTree(SerializedObject serializedObject, object? propertyHandlerCache)
+		public static List<PropertyTree> BuildTree(SerializedObject serializedObject, ArrayDrawer? editor)
 		{
 			var extras = serializedObject.targetObject.GetType().GetCustomAttributes<PropertyAttribute>(true);
 
@@ -650,7 +612,8 @@ namespace NAF.Inspector.Editor
 			do
 			{
 				PropertyTree tree = PropertyCache.TreePool.Get();
-				tree.Reset(iterator, null, propertyHandlerCache, extras);
+				propertyAttributesBuffer.AddRange(extras);
+				tree.Reset(iterator, editor);
 				trees.Add(tree);
 			}
 			while (UnityInternals.SerializedProperty_isValid(iterator));
@@ -674,6 +637,8 @@ namespace NAF.Inspector.Editor
 
 		private readonly static Lazy<Dictionary<Type, DrawerPoolData>> _drawerTypeDictionary = new(BuildDrawerTypeForTypeDictionary, true);
 
+		private readonly static ObjectPool<NAFPropertyDrawer> _reorderableDrawerPool = new ObjectPool<NAFPropertyDrawer>(() => new ReorderableDrawer());
+
 		private static Dictionary<Type, DrawerPoolData> BuildDrawerTypeForTypeDictionary()
 		{
 			var tempDictionary = new Dictionary<Type, DrawerPoolData>();
@@ -690,6 +655,7 @@ namespace NAF.Inspector.Editor
 					}
 				}
 			}
+
 			return tempDictionary;
 		}
 	
@@ -705,6 +671,10 @@ namespace NAF.Inspector.Editor
 				}
 				it = it.BaseType;
 			}
+
+			if (type.IsArrayOrList())
+				return _reorderableDrawerPool;
+
 			return null;
 		}
 
@@ -724,10 +694,8 @@ namespace NAF.Inspector.Editor
 			AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
 			ChangesCache.OnClear += InvalidateDrawers;
 
-			Current = this;
 			LayoutDrawID = 0;
-			_trees = PropertyTree.BuildTree(serializedObject, UnityInternals.Editor_m_PropertyHandlerCache(this));
-			Current = null;
+			_trees = PropertyTree.BuildTree(serializedObject, this);
 		}
 
 		private void OnDisable()

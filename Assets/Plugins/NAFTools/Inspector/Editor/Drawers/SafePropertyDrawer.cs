@@ -9,6 +9,7 @@ namespace NAF.Inspector.Editor
 {
 	using System;
 	using System.Collections.Generic;
+	using System.Diagnostics.CodeAnalysis;
 	using System.Reflection;
 	using System.Runtime.CompilerServices;
 	using System.Threading.Tasks;
@@ -85,6 +86,8 @@ namespace NAF.Inspector.Editor
 			Enabled = false;
 		}
 
+		public virtual bool EndsDrawing => false;
+		public virtual bool OnlyDrawWithEditor => false;
 		protected virtual Task OnEnable(in SerializedProperty property) => Task.CompletedTask;
 		protected virtual void OnUpdate(SerializedProperty property) { }
 		protected virtual void OnDisable() { }
@@ -250,6 +253,12 @@ namespace NAF.Inspector.Editor
 				FixProperty(property, depth, path);
 				return LastHeight = ErrorHeight();
 			}
+		}
+
+		public static bool TryGet(PropertyTree tree, in SerializedProperty property, Type? drawerForType, PropertyAttribute? attribute, [NotNullWhen(true)] out NAFPropertyDrawer? drawer)
+		{
+			drawer = Get(tree, property, drawerForType, attribute);
+			return drawer != null;
 		}
 
 		public static NAFPropertyDrawer? Get(PropertyTree tree, in SerializedProperty property, Type? drawerForType, PropertyAttribute? attribute)
