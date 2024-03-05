@@ -10,30 +10,30 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(OnValidateAttribute))]
 	public class OnValidateAttributeDrawer : NAFPropertyDrawer
 	{
+		//  TODO WIP
+
 		private Func<object, object, object> method;
 
-		protected override Task OnEnable(in SerializedProperty property)
-		{
-			var attribute = (OnValidateAttribute)Attribute;
+		// protected override Task OnEnable(in SerializedProperty property)
+		// {
+		// 	var attribute = (OnValidateAttribute)Attribute;
 
-			return PropertyFieldCompiler<object>.Load(property, attribute.Expression).ContinueWith(t =>
-			{
-				method = t.Result;
-			});
-		}
+		// 	return PropertyFieldCompiler<object>.GetOrAsyncCreate(property, attribute.Expression)
+		// 		.Callback(t => method = t);
+		// }
 
-		protected override void OnUpdate(SerializedProperty property)
-		{
-			var targets = PropertyTargets.GetValues(property);
-			for (int i = 0; i < targets.Length; i++)
-			{
-				try { method(targets.ParentValues[i], targets.FieldValues[i]); }
-				catch (Exception e)
-				{
-					Debug.LogError("There was an error executing method called from a " + nameof(OnValidateAttribute) + ". See following log for details.");
-					Debug.LogException(e);
-				}
-			}
-		}
+		// protected override void OnUpdate(SerializedProperty property)
+		// {
+		// 	var targets = PropertyTargets.Resolve(property);
+		// 	for (int i = 0; i < targets.Length; i++)
+		// 	{
+		// 		try { method(targets.ParentValues[i], targets.FieldValues[i]); }
+		// 		catch (Exception e)
+		// 		{
+		// 			Debug.LogError("There was an error executing method called from a " + nameof(OnValidateAttribute) + ". See following log for details.");
+		// 			Debug.LogException(e);
+		// 		}
+		// 	}
+		// }
 	}
 }

@@ -1,7 +1,28 @@
 namespace NAF.Inspector.Editor
 {
+	using Unity.Properties;
 	using UnityEditor;
 	using UnityEngine;
+
+	[CustomPropertyDrawer(typeof(MinAttribute))]
+	public class NAFMinDrawer : NAFPropertyDrawer
+	{
+		private float Min => ((MinAttribute)Attribute).min;
+		public override bool OnlyDrawWithEditor => true;
+
+		protected override void OnGUI(Rect position)
+		{
+			EditorGUI.BeginChangeCheck();
+			base.OnGUI(position);
+			if (EditorGUI.EndChangeCheck())
+			{
+				Tree.Property.ModifyNumberProperty(
+					l => l >= Min ? l : (long)Min,
+					f => f >= Min ? f : Min
+				);
+			}
+		}
+	}
 
 	[CustomPropertyDrawer(typeof(SpaceAttribute))]
 	public class NAFSpaceDrawer : NAFPropertyDrawer
@@ -9,18 +30,18 @@ namespace NAF.Inspector.Editor
 		private float Size => ((SpaceAttribute)Attribute).height;
 		public override bool OnlyDrawWithEditor => true;
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
 			Rect spaceRect = position;
 			spaceRect.height = Size;
 			// EditorGUI.DrawRect(spaceRect, UnityEngine.Random.ColorHSV());
 			position.yMin += Size;
-			base.OnGUI(position, property, label);
+			base.OnGUI(position);
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			return base.OnGetHeight(property, label) + Size;
+			return base.OnGetHeight() + Size;
 		}
 	}
 
@@ -44,7 +65,7 @@ namespace NAF.Inspector.Editor
 			return EditorGUIUtility.singleLineHeight * 1.5f + (eachLineHeight * (lines - 1));
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
 			// position.y += EditorGUIUtility.singleLineHeight * 0.5f;
 			float height = Height();
@@ -57,12 +78,12 @@ namespace NAF.Inspector.Editor
 			GUI.Label(headerRect, Header, EditorStyles.boldLabel);
 
 			position.yMin += height;
-			base.OnGUI(position, property, label);
+			base.OnGUI(position);
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			return base.OnGetHeight(property, label) + Height();
+			return base.OnGetHeight() + Height();
 		}
 	}
 }

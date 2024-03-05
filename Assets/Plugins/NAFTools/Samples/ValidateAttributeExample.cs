@@ -77,7 +77,7 @@ namespace NAF.Samples
 		[Required]
 		public LayerMask RequiredMask = default;
 
-		[Required, Min(0)]
+		[Required(Icon = EditorIcons.d_console_warnicon_2x), Min(0)]
 		public float RequiredSeconds = default;
 	}
 }

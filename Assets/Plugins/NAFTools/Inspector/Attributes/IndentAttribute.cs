@@ -10,7 +10,7 @@ namespace NAF.Inspector
 	using System;
 	using UnityEngine;
 
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = false)]
+	[AttributeUsage(System.AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class IndentAttribute : PropertyAttribute, IArrayPropertyAttribute
 	{

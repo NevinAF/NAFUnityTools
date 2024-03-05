@@ -12,7 +12,7 @@ using UnityEngine;
 #nullable enable
 namespace NAF.Inspector
 {
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = true)]
+	[AttributeUsage(System.AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = true)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class LabelContentAttribute : PropertyAttribute, IContentAttribute, IArrayPropertyAttribute
 	{
@@ -25,6 +25,11 @@ namespace NAF.Inspector
 		public bool DrawOnArray { get => _drawOnArray; set => _drawOnArray = value; }
 		public bool DrawOnElements { get => !DrawOnArray; set => DrawOnArray = !value; }
 		public bool DrawOnField => true;
+
+		public LabelContentAttribute()
+		{
+			order = -100;
+		}
 	}
 }
 #nullable restore

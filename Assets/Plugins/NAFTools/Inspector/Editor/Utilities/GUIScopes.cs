@@ -48,31 +48,22 @@ namespace NAF.Inspector.Editor
 
 		private readonly float _previous;
 		public static LabelWidthScope Zero => new LabelWidthScope(0);
+		public static LabelWidthScope MiniLabelW => new LabelWidthScope(kMiniLabelW);
 
 		public LabelWidthScope(float newValue = 0)
 		{
 			this._previous = EditorGUIUtility.labelWidth;
-			EditorGUIUtility.labelWidth += newValue;
+			EditorGUIUtility.labelWidth = newValue;
 		}
 
-		public LabelWidthScope(GUIContent label, float prefixLabelWidth = -1)
+		public LabelWidthScope(GUIContent label) :
+			this(Mathf.Max(EditorStyles.label.CalcSize(label).x, kMiniLabelW))
 		{
-			this._previous = EditorGUIUtility.labelWidth;
-			EditorGUIUtility.labelWidth = GetWidth(label, prefixLabelWidth);
 		}
 
 		public readonly void Dispose()
 		{
 			EditorGUIUtility.labelWidth = this._previous;
-		}
-
-		private static float GetWidth(GUIContent Label, float prefixLabelWidth = -1)
-		{
-			float LabelWidth = EditorStyles.label.CalcSize(Label).x;
-			if (LabelWidth > kMiniLabelW)
-				return prefixLabelWidth > 0f ? prefixLabelWidth + LabelWidth : LabelWidth;
-			else
-				return prefixLabelWidth > 0f ? prefixLabelWidth + kMiniLabelW : kMiniLabelW;
 		}
 	}
 

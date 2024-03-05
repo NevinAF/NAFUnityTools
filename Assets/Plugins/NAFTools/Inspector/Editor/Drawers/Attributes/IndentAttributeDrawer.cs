@@ -7,19 +7,19 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(IndentAttribute))]
 	public class IndentAttributeDrawer : NAFPropertyDrawer
 	{
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
 			int indent = ((IndentAttribute)Attribute).Indent;
 			EditorGUI.indentLevel += indent;
 
-			base.OnGUI(position, property, label);
+			base.OnGUI(position);
 
 			EditorGUI.indentLevel -= indent;
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			return base.OnGetHeight(property, label);
+			return base.OnGetHeight();
 		}
 	}
 }

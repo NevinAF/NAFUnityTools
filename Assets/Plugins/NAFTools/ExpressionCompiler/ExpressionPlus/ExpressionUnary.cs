@@ -42,7 +42,6 @@ namespace NAF.ExpressionCompiler
 		{
 			RequiresCanRead(term);
 			Expression expr = ExpectTerm(term);
-			// TODO: Not null
 			TypeUtils.ValidateType(type);
 
 			if (TypeUtils.AreEquivalent(expr.Type, type))

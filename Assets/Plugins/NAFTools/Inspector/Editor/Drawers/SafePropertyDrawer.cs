@@ -49,36 +49,27 @@ namespace NAF.Inspector.Editor
 		private PropertyAttribute? m_attribute;
 		private Task enablingTask = Task.CompletedTask;
 		private State _state;
-		private int _drawCall;
 		private float _cachedHeight;
-
-		public bool LastHeightValid => _cachedHeight >= 0f && _drawCall == ArrayDrawer.Current!.LayoutDrawID && !Invalidated;
-		public float LastHeight {
-			get => _cachedHeight;
-			private set {
-				_cachedHeight = value;
-				_drawCall = ArrayDrawer.Current!.LayoutDrawID;
-			}
-		}
 
 		public PropertyTree Tree => m_tree ?? throw new InvalidOperationException("PropertyTree is not set.");
 		public PropertyAttribute? Attribute => m_attribute;
-		public FieldInfo? FieldInfo => Tree.FieldInfo;
 
-		private bool Enabled {
+		public bool Enabled {
 			get => (_state & State.Enabled) != 0;
-			set => _state = value ? _state | State.Enabled : _state & ~State.Enabled;
+			private set => _state = value ? _state | State.Enabled : _state & ~State.Enabled;
 		}
 
-		private bool Invalidated {
+		public bool Invalidated {
 			get => (_state & State.Invalidated) != 0;
-			set => _state = value ? _state | State.Invalidated : _state & ~State.Invalidated;
+			private set => _state = value ? _state | State.Invalidated : _state & ~State.Invalidated;
 		}
 
-		private bool UsesUpdate {
+		public bool UsesUpdate {
 			get => (_state & State.UsesUpdate) != 0;
-			set => _state = value ? _state | State.UsesUpdate : _state & ~State.UsesUpdate;
+			private set => _state = value ? _state | State.UsesUpdate : _state & ~State.UsesUpdate;
 		}
+
+		public float LastHeight => _cachedHeight;
 
 		protected NAFPropertyDrawer()
 		{
@@ -88,33 +79,28 @@ namespace NAF.Inspector.Editor
 
 		public virtual bool EndsDrawing => false;
 		public virtual bool OnlyDrawWithEditor => false;
-		protected virtual Task OnEnable(in SerializedProperty property) => Task.CompletedTask;
-		protected virtual void OnUpdate(SerializedProperty property) { }
+		protected virtual Task OnEnable() => Task.CompletedTask;
+		protected virtual void OnUpdate() { }
 		protected virtual void OnDisable() { }
-		protected virtual void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+
+		protected virtual float OnGetHeight() => Tree.GetHeight();
+		protected virtual float GetLoadingHeight() => Tree.GetHeight();
+
+		protected virtual void OnGUI(Rect position)
 		{
-			position.height = Tree.InPlaceGetHeight(property, label);
-			Tree.OnGUI(position, property, label);
-		}
-		protected virtual void LoadingGUI(Rect position, SerializedProperty property, GUIContent label)
-		{
-			position.height = EditorGUIUtility.singleLineHeight;
-			EditorGUI.LabelField(position, TempUtility.Content("Loading...", EditorIcons.Loading));
-			property.NextVisible(false);
-		}
-		
-		protected virtual float OnGetHeight(SerializedProperty property, GUIContent label)
-		{
-			return Tree.IterateGetHeight(property, label);
+			position.height = Tree.GetHeight();
+			Tree.OnGUI(position);
 		}
 
-		protected virtual float GetLoadingHeight(SerializedProperty property, GUIContent label)
+		protected virtual void LoadingGUI(Rect position)
 		{
-			return Tree.IterateGetHeight(property, label);
+			// position.height = EditorGUIUtility.singleLineHeight;
+			// EditorGUI.LabelField(position, TempUtility.Content("Loading...", EditorIcons.Loading));
+			position.height = Tree.GetHeight();
+			Tree.OnGUI(position);
 		}
 
-
-		private void Enable(in SerializedProperty property)
+		private void Enable()
 		{
 			if (Enabled == true)
 				return;
@@ -125,15 +111,20 @@ namespace NAF.Inspector.Editor
 				return;
 			}
 
+			enableTime = DateTime.Now;
 			Enabled = true;
 			Invalidated = true;
-			_cachedHeight = float.MinValue;
-			enablingTask = OnEnable(property);
-			enablingTask.ContinueWith(RequestRepaintTask);
+			enablingTask = OnEnable();
+
+			if (!enablingTask.IsCompleted)
+				enablingTask = enablingTask.Callback(RequestRepaintTask);
 		}
 
-		private void RequestRepaintTask(Task t)
+		private DateTime enableTime;
+
+		private void RequestRepaintTask()
 		{
+			UnityEngine.Debug.Log($"PropertyDrawer {GetType().Name} took {DateTime.Now - enableTime} to enable.");
 			// Make sure that this wasn't disabled before the task completed,
 			// and that this wasn't already repainted (thus no longer invalid).
 			if (!Enabled || !Invalidated)
@@ -177,91 +168,86 @@ namespace NAF.Inspector.Editor
 			return false;
 		}
 
-		public void DoGUI(Rect position, SerializedProperty property, GUIContent label)
+		public void DoGUI(Rect position)
 		{
 			if (enablingTask.IsCompleted)
 			{
 				if (enablingTask.IsFaulted)
 				{
-					property.NextVisible(false);
-					ErrorGUI(position, label, enablingTask.Exception);
+					ErrorGUI(position, Tree.PropertyLabel, enablingTask.Exception);
 					return;
 				}
+				
+				DoUpdate();
 			}
-
-			int depth = property.depth;
-			string path = property.propertyPath;
 
 			try {
 				if (enablingTask.IsCompleted == false || Invalidated)
-					LoadingGUI(position, property, label);
-				else OnGUI(position, property, label);
+					LoadingGUI(position);
+				else OnGUI(position);
+			}
+			catch (ExitGUIException) // Stops drawing all subsequent drawers
+			{
+				throw;
 			}
 			catch (Exception e)
 			{
-				FixProperty(property, depth, path);
-				ErrorGUI(position, label, e);
+				enablingTask = Task.FromException(e);
+				ErrorGUI(position, Tree.PropertyLabel, e);
 			}
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void FixProperty(SerializedProperty property, int depth, string path)
-		{
-			// If throw exception while iterating through properties, exit to get to the end of the original property.
-			if (UnityInternals.SerializedProperty_isValid(property))
-			{
-				if (depth > property.depth) 
-				{
-					while (property.NextVisible(false) && depth > property.depth);
-				}
-				// If the property was not moved, move to the next property.
-				else if (path == property.propertyPath)
-				{
-					property.NextVisible(false);
-				}
-			}
-		}
-
-		public float DoGetHeight(SerializedProperty property, GUIContent label)
+		public float DoGetHeight()
 		{
 			if (enablingTask.IsCompleted)
 			{
 				if (enablingTask.IsFaulted)
 				{
-					property.NextVisible(false);
-					return LastHeight = ErrorHeight();
+					return _cachedHeight = ErrorHeight();
 				}
 
-				if (Invalidated)
-				{
-					if (UsesUpdate)
-						OnUpdate(property);
-					Invalidated = false;
-				}
+				DoUpdate();
 			}
-
-			int depth = property.depth;
-			string path = property.propertyPath;
 
 			try {
 				if (enablingTask.IsCompleted == false)
-					return LastHeight = GetLoadingHeight(property, label);
-				else return LastHeight = OnGetHeight(property, label);
+					return _cachedHeight = GetLoadingHeight();
+				else return _cachedHeight = OnGetHeight();
 			}
-			catch (Exception)
+			catch (ExitGUIException) // Stops drawing all subsequent drawers
 			{
-				FixProperty(property, depth, path);
-				return LastHeight = ErrorHeight();
+				throw;
+			}
+			catch (Exception e)
+			{
+				enablingTask = Task.FromException(e);
+				return _cachedHeight = ErrorHeight();
 			}
 		}
 
-		public static bool TryGet(PropertyTree tree, in SerializedProperty property, Type? drawerForType, PropertyAttribute? attribute, [NotNullWhen(true)] out NAFPropertyDrawer? drawer)
+		private void DoUpdate()
 		{
-			drawer = Get(tree, property, drawerForType, attribute);
+			if (Invalidated)
+			{
+				if (UsesUpdate) try
+				{
+					OnUpdate();
+				}
+				catch (Exception e)
+				{
+					enablingTask = Task.FromException(e);
+				}
+				Invalidated = false;
+			}
+		}
+
+		public static bool TryGet(PropertyTree tree, Type? drawerForType, PropertyAttribute? attribute, [NotNullWhen(true)] out NAFPropertyDrawer? drawer)
+		{
+			drawer = Get(tree, drawerForType, attribute);
 			return drawer != null;
 		}
 
-		public static NAFPropertyDrawer? Get(PropertyTree tree, in SerializedProperty property, Type? drawerForType, PropertyAttribute? attribute)
+		public static NAFPropertyDrawer? Get(PropertyTree tree, Type? drawerForType, PropertyAttribute? attribute)
 		{
 			if (drawerForType == null)
 				return null;
@@ -274,7 +260,21 @@ namespace NAF.Inspector.Editor
 			drawer.m_tree = tree;
 			drawer.m_attribute = attribute;
 			drawer.m_sourcePool = sourcePool;
-			drawer.Enable(property);
+
+			if (tree.BlocksChildren)
+			{
+				UnityEngine.Debug.LogWarning("PropertyTree already has a drawer that blocks further drawing, but there are more drawers trying to be drawn after it: " + drawer.GetType().Name);
+				drawer.Return();
+				return null;
+			}
+
+			if (tree.Editor == null && drawer.OnlyDrawWithEditor)
+			{
+				drawer.Return();
+				return null;
+			}
+
+			drawer.Enable();
 			return drawer;
 		}
 

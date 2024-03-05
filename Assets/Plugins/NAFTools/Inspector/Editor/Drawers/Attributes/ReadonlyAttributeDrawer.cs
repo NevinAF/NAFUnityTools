@@ -10,22 +10,29 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(EnableIfAttribute))]
 	public class ReadonlyAttributeDrawer : NAFPropertyDrawer
 	{
-		private bool _cResult;
+		private AttributeExprCache<bool> conditional;
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override async Task OnEnable()
 		{
-			return AttributeEvaluator.Load((IConditionalAttribute)Attribute, property);
+			conditional = await AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, Tree.Property);
 		}
 
-		protected override void OnUpdate(SerializedProperty property)
+		protected override void OnUpdate()
 		{
-			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, property);
+			conditional.Refresh(Tree.Property);
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+
+		protected override void OnGUI(Rect position)
 		{
-			using (new DisabledScope(_cResult))
-				base.OnGUI(position, property, label);
+			using (new DisabledScope(conditional))
+				base.OnGUI(position);
+		}
+
+		protected override void LoadingGUI(Rect position)
+		{
+			using (new DisabledScope(true))
+				base.LoadingGUI(position);
 		}
 	}
 }

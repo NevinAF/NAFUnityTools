@@ -18,7 +18,7 @@ namespace NAF.Inspector
 		Error = 3
 	}
 
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = true)]
+	[AttributeUsage(System.AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = true)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class AttachedAttribute : InlineLabelAttribute, IArrayPropertyAttribute
 	{

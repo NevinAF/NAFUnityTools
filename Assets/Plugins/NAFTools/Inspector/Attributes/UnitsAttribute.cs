@@ -131,7 +131,7 @@ namespace NAF.Inspector
 		public object storeAs;
 		public object value;
 
-		public static float Convert(float value, object from, object to)
+		public static double Convert(double value, object from, object to)
 		{
 			return MathOps.RoundPoint(value * ConversionTable[from] / ConversionTable[to], 5);
 		}

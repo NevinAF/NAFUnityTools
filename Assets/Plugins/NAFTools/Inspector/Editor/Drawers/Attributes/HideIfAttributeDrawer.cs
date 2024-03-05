@@ -10,35 +10,37 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(ShowIfAttribute))]
 	public class HideIfAttributeDrawer : NAFPropertyDrawer
 	{
-		private bool _cResult;
+		private AttributeExprCache<bool> conditional;
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override async Task OnEnable()
 		{
-			return AttributeEvaluator.Load((IConditionalAttribute)Attribute, property);
+			conditional = await AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, Tree.Property);
 		}
 
-		protected override void OnUpdate(SerializedProperty property)
+		protected override void OnUpdate()
 		{
-			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, property);
+			conditional.Refresh(Tree.Property);
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			if (_cResult)
-			{
-				property.NextVisible(false);
-				return 0f;
-			}
-			else return base.OnGetHeight(property, label);
+			return conditional ? 0f : base.OnGetHeight();
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
-			if (_cResult)
-			{
-				property.NextVisible(false);
-			}
-			else base.OnGUI(position, property, label);
+			if (!conditional)
+				base.OnGUI(position);
+		}
+
+		// Don't show while loading?
+		protected override void LoadingGUI(Rect position)
+		{
+		}
+
+		protected override float GetLoadingHeight()
+		{
+			return 0f;
 		}
 	}
 }

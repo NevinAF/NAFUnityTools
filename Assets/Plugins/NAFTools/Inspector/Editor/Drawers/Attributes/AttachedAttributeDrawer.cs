@@ -21,25 +21,31 @@ namespace NAF.Inspector.Editor
 		#endregion
 
 		private Component[]? _options;
+		private Type? componentType;
 
-		protected override void OnUpdate(SerializedProperty property)
+		protected override Task OnEnable()
 		{
-			if (FieldInfo == null)
+			if (Tree.FieldInfo == null)
 				throw new Exception("The 'Attached' attribute can only be used on fields!");
 
-			Component target = property.serializedObject.targetObject as Component ??
-				throw new Exception("The 'Attached' attribute can only be used on Component fields (like a MonoBehaviour)!");
+			componentType = Tree.FieldInfo.FieldType.IsArray ? Tree.FieldInfo.FieldType.GetArrayOrListElementType()! : Tree.FieldInfo.FieldType;
 
-			Type componentType = FieldInfo.FieldType.IsArray ? FieldInfo.FieldType.GetElementType()! : FieldInfo.FieldType;
+			return Task.CompletedTask;
+		}
+
+		protected override void OnUpdate()
+		{
+			Component target = Tree.Property.serializedObject.targetObject as Component ??
+				throw new Exception("The 'Attached' attribute can only be used on Component fields (like a MonoBehaviour)!");
 
 			if (!typeof(Component).IsAssignableFrom(componentType))
 			{
-				throw new Exception("The 'Attached' attribute can only be used on fields with a component type! Currently it is being used on a '" + componentType.Name + "' field (" + property.propertyType + ").");
+				throw new Exception("The 'Attached' attribute can only be used on fields with a component type! Currently it is being used on a '" + componentType!.Name + "' field (" + Tree.Property.propertyType + ").");
 			}
 			
 			_options = null;
 
-			if (property.serializedObject.isEditingMultipleObjects)
+			if (Tree.Property.serializedObject.isEditingMultipleObjects)
 				return;
 
 			Component[] options;
@@ -62,36 +68,38 @@ namespace NAF.Inspector.Editor
 
 			_options = options;
 
-			if (property.isArray)
-				UpdateArray(property);
-			else
-				UpdateElement(property);
+			if (Tree.IsArrayProperty) UpdateArray();
+			else UpdateElement();
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
-			if (property.isArray)
-				DrawArray(position, property, label);
-			else
-				DrawElement(position, property, label);
+			if (Tree.IsArrayProperty) DrawArray(position);
+			else DrawElement(position);
+		}
+
+		protected override void LoadingGUI(Rect position)
+		{
+			using (DisabledScope.True)
+				base.LoadingGUI(position);
 		}
 
 		#region Element Drawing
 
-		private void UpdateElement(in SerializedProperty property)
+		private void UpdateElement()
 		{
 			if (_options == null)
 			{
 				((AttachedAttribute)Attribute!).Style ??= EditorStyles.helpBox;
-				base.OnUpdate(property); // Sets the missing style and content
+				base.OnUpdate(); // Sets the missing style and content
 				return;
 			}
 	
-			if (property.objectReferenceValue == null || Array.IndexOf(_options, property.objectReferenceValue) == -1)
-				property.objectReferenceValue = _options[0];
+			if (Tree.Property.objectReferenceValue == null || Array.IndexOf(_options, Tree.Property.objectReferenceValue) == -1)
+				Tree.Property.objectReferenceValue = _options[0];
 		}
 
-		private void DrawElement(Rect position, SerializedProperty property, GUIContent label)
+		private void DrawElement(Rect position)
 		{
 			AttachedAttribute attachedAttribute = (AttachedAttribute)Attribute!;
 			if (_options == null)
@@ -100,27 +108,27 @@ namespace NAF.Inspector.Editor
 				multiContent.tooltip = "Multi object editing is not supported with using the 'Attached' attribute button.";
 
 				using (DisabledScope.True)
-					DrawAsLabel(attachedAttribute.Alignment, position, multiContent, EditorStyles.miniButton, property, label);
+					DrawAsLabel(attachedAttribute.Alignment, position, multiContent, EditorStyles.miniButton);
 			}
 			else if (_options.Length == 0)
 			{
-				DrawAsLabel(attachedAttribute.Alignment, position, content, style, property, label); // draw the missing content.
+				DrawAsLabel(attachedAttribute.Alignment, position, content, style); // draw the missing content.
 			}
 			else
 			{
-				if (DrawAsButton(attachedAttribute.Alignment, position, DropdownButtonContent, EditorStyles.miniButton, property, label))
+				if (DrawAsButton(attachedAttribute.Alignment, position, DropdownButtonContent, EditorStyles.miniButton))
 				{
 					Rect buttonEst = new Rect(Event.current.mousePosition.x - 10, position.y, 10, position.height);
-					ShowOptionsDropdown(property, buttonEst);
+					ShowOptionsDropdown(buttonEst);
 				}
 			}
 		}
 
-		private void ShowOptionsDropdown(SerializedProperty property, Rect buttonRect)
+		private void ShowOptionsDropdown(Rect buttonRect)
 		{
 			TreeMenu menu = TreeMenu.New();
-			Transform transform = (property.serializedObject.targetObject as Component)!.transform;
-			string typeName = FieldInfo!.FieldType.Name;
+			Transform transform = (Tree.Property.serializedObject.targetObject as Component)!.transform;
+			string typeName = Tree.FieldInfo!.FieldType.Name;
 
 			menu.AddItem(TreeMenu.Item.FromTransformHierarchy(transform, Convert)!);
 
@@ -131,8 +139,8 @@ namespace NAF.Inspector.Editor
 
 			void Clicked(object o)
 			{
-				property.objectReferenceValue = o as Component;
-				property.serializedObject.ApplyModifiedProperties();
+				Tree.Property.objectReferenceValue = o as Component;
+				Tree.Property.serializedObject.ApplyModifiedProperties();
 				menu?.Close();
 			}
 
@@ -144,7 +152,7 @@ namespace NAF.Inspector.Editor
 
 			TreeMenu.Item Convert(Transform child)
 			{
-				Component[] components = child.GetComponents(FieldInfo.FieldType);
+				Component[] components = child.GetComponents(Tree.FieldInfo.FieldType);
 				TreeMenu.Item item;
 				GUIContent content;
 
@@ -153,7 +161,7 @@ namespace NAF.Inspector.Editor
 					content = Content(components[0]);
 					item = new(content, Clicked, components[0])
 					{
-						selected = property.objectReferenceValue == components[0]
+						selected = Tree.Property.objectReferenceValue == components[0]
 					};
 				}
 				else
@@ -165,7 +173,7 @@ namespace NAF.Inspector.Editor
 					{
 						Component component = components[i];
 						item.AddItem(Content(component), Clicked, component);
-						item.children![i].selected = property.objectReferenceValue == component;
+						item.children![i].selected = Tree.Property.objectReferenceValue == component;
 					}
 				}
 
@@ -177,15 +185,15 @@ namespace NAF.Inspector.Editor
 
 		#region Array Drawing
 
-		private void UpdateArray(in SerializedProperty property)
+		private void UpdateArray()
 		{
 			if (_options == null)
 				return;
 
-			bool invalid = _options.Length != property.arraySize;
+			bool invalid = _options.Length != Tree.Property.arraySize;
 			if (!invalid)
 			{
-				SerializedProperty iterator = property.Copy();
+				SerializedProperty iterator = Tree.Property.Copy();
 				iterator.Next(true); // .Array
 				iterator.Next(true); // .Array.size
 
@@ -202,13 +210,13 @@ namespace NAF.Inspector.Editor
 
 			if (invalid)
 			{
-				property.ClearArray();
+				Tree.Property.ClearArray();
 				for (int i = 0; i < _options.Length; i++)
 				{
-					property.InsertArrayElementAtIndex(i);
+					Tree.Property.InsertArrayElementAtIndex(i);
 				}
 
-				SerializedProperty iterator = property.Copy();
+				SerializedProperty iterator = Tree.Property.Copy();
 				iterator.Next(true); // .Array
 				iterator.Next(true); // .Array.size
 
@@ -220,10 +228,10 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		private void DrawArray(Rect position, SerializedProperty property, GUIContent label)
+		private void DrawArray(Rect position)
 		{
 			using (DisabledScope.True)
-				base.OnGUI(position, property, label);
+				base.OnGUI(position);
 		}
 
 		#endregion

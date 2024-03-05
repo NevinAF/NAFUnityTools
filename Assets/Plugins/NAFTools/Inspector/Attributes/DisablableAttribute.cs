@@ -5,7 +5,6 @@
  * @author Nevin Foster
  * @since  14.06.23
  */
-#nullable enable
 namespace NAF.Inspector
 {
 	using System;
@@ -13,18 +12,20 @@ namespace NAF.Inspector
 
 	[AttributeUsage(System.AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
-	public class GraphAttribute : PropertyAttribute, IArrayPropertyAttribute
+	public class DisablableAttribute : PropertyAttribute, IArrayPropertyAttribute
 	{
-		public string Selector { get; }
-
-		public bool _drawOnArray = true;
-		public bool DrawOnArray { get => _drawOnArray; set => _drawOnArray = value; }
-		public bool DrawOnElements { get => !DrawOnArray; set => DrawOnArray = !value; }
+		public bool DrawOnArray => true;
+		public bool DrawOnElements => false;
 		public bool DrawOnField => true;
 
-		public GraphAttribute(string selector)
+		public object EnabledDefault;
+		public object Disabled;
+
+		public DisablableAttribute() { }
+
+		public DisablableAttribute(object enabledDefault)
 		{
-			Selector = selector;
+			EnabledDefault = enabledDefault;
 		}
 	}
 }

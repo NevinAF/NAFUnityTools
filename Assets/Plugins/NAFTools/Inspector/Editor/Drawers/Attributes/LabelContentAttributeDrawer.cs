@@ -5,41 +5,42 @@ namespace NAF.Inspector.Editor
 	using UnityEngine;
 	using System;
 	using System.Threading.Tasks;
+	using Unity.Properties;
 
 	[CustomPropertyDrawer(typeof(LabelContentAttribute))]
 	public class LabelContentAttributeDrawer : NAFPropertyDrawer
 	{
-		protected GUIContent content;
-		protected GUIStyle style;
+		protected AttributeExprCache<GUIContent> content;
+		protected AttributeExprCache<GUIStyle> style;
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override async Task OnEnable()
 		{
-			var contentAttribute = (IContentAttribute)Attribute;
-			return AttributeEvaluator.Load(contentAttribute, property);
+			var contentAttribute = (LabelContentAttribute)Attribute;
+			(content, style) = await AttributeEvaluator.Content(contentAttribute, Tree.Property);
 		}
 
-		protected override void OnUpdate(SerializedProperty property)
+		protected override void OnUpdate()
 		{
-			var contentAttribute = (IContentAttribute)Attribute;
-			AttributeEvaluator.PopulateContent(contentAttribute, property, ref content);
-			style = AttributeEvaluator.ResolveStyle(contentAttribute, property);
+			content.Refresh(Tree.Property);
+			style.Refresh(Tree.Property, null);
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			return base.OnGetHeight(property, label);
+			return base.OnGetHeight();
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
-			if (style == null)
+			if (style.Value == null)
 			{
-				base.OnGUI(position, property, content);
+				Tree.PropertyLabel = content;
+				base.OnGUI(position);
 				return;
 			}
 
 			EditorGUI.LabelField(position, content, style);
-			base.OnGUI(position, property, GUIContent.none);
+			base.OnGUI(position);
 		}
 	}
 }

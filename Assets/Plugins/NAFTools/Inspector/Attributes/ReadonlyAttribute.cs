@@ -11,7 +11,7 @@ namespace NAF.Inspector
 	using System;
 	using UnityEngine;
 
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = false)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class ReadonlyAttribute : PropertyAttribute, IConditionalAttribute, IArrayPropertyAttribute
 	{
@@ -24,7 +24,7 @@ namespace NAF.Inspector
 		public bool DrawOnField => true;
 	}
 
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = false)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class DisableIfAttribute : ReadonlyAttribute
 	{
@@ -34,7 +34,7 @@ namespace NAF.Inspector
 		}
 	}
 
-	[AttributeUsage(System.AttributeTargets.Field, Inherited = true, AllowMultiple = false)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
 	[System.Diagnostics.Conditional("UNITY_EDITOR")]
 	public class EnableIfAttribute : ReadonlyAttribute
 	{
@@ -42,6 +42,18 @@ namespace NAF.Inspector
 		{
 			Condition = conditionMethod;
 			Invert = !Invert;
+		}
+	}
+
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Class | AttributeTargets.Struct, Inherited = true, AllowMultiple = false)]
+	[System.Diagnostics.Conditional("UNITY_EDITOR")]
+	public class DisableOnPlayAttribute : ReadonlyAttribute
+	{
+		public DisableOnPlayAttribute()
+		{
+		#if UNITY_EDITOR
+			Condition = UnityEditor.EditorApplication.isPlaying;
+		#endif
 		}
 	}
 }

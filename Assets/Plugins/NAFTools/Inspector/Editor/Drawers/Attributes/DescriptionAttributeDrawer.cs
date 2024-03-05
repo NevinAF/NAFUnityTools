@@ -9,23 +9,24 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(DescriptionAttribute))]
 	public class DescriptionAttributeDrawer : NAFPropertyDrawer
 	{
-		private GUIContent content;
-		private GUIStyle style;
+		protected AttributeExprCache<GUIContent> content;
+		protected AttributeExprCache<GUIStyle> style;
 
 		private float ViewWidth => EditorGUIUtility.currentViewWidth - 16f - UnityInternals.EditorGUI_indent;
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override async Task OnEnable()
 		{
-			return AttributeEvaluator.Load((DescriptionAttribute)Attribute, property);
+			var contentAttribute = (DescriptionAttribute)Attribute;
+			(content, style) = await AttributeEvaluator.Content(contentAttribute, Tree.Property);
 		}
 
-		protected override void OnUpdate(SerializedProperty property)
+		protected override void OnUpdate()
 		{
-			AttributeEvaluator.PopulateContent((DescriptionAttribute)Attribute, property, ref content);
-			style = AttributeEvaluator.ResolveStyle((DescriptionAttribute)Attribute, property) ?? EditorStyles.wordWrappedLabel;
+			content.Refresh(Tree.Property);
+			style.Refresh(Tree.Property, EditorStyles.wordWrappedLabel);
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		private void SelfGUI(ref Rect position, GUIContent content, GUIStyle style)
 		{
 			Rect descRect = position;
 			descRect.width = ViewWidth;
@@ -35,67 +36,53 @@ namespace NAF.Inspector.Editor
 			EditorGUI.LabelField(descRect, content, style);
 
 			position.yMin += descRect.height;
-			base.OnGUI(position, property, label);
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		private float SelfHeight(GUIContent content, GUIStyle style)
 		{
-			return style.CalcHeight(content, ViewWidth) + base.OnGetHeight(property, label);
+			return style.CalcHeight(content, ViewWidth);
 		}
 
-		// private float? _height = null;
+		protected override void OnGUI(Rect position)
+		{
+			SelfGUI(ref position, content, style);
+			base.OnGUI(position);
+		}
 
-		// public override void DrawElement(Rect position, SerializedProperty property, GUIContent label)
-		// {
-		// 	DescriptionAttribute attribute = this.attribute as DescriptionAttribute;
+		protected override float OnGetHeight()
+		{
+			return SelfHeight(content, style) + base.OnGetHeight();
+		}
 
-		// 	var content = AttributeEvaluator.TempContent(attribute, property);
-		// 	var style = AttributeEvaluator.ResolveStyle(attribute, property);
+		protected override void LoadingGUI(Rect position)
+		{
+			var attribute = (DescriptionAttribute)Attribute;
 
-		// 	_height = style.CalcHeight(content, position.width);
-		// 	float height = _height.Value;
+			if (attribute.Label is string label && label.Length != 0 && label[0] != PropertyFieldCompiler.ExpressionSymbol)
+			{
+				var labelContent = TempUtility.Content(label);
+				var labelStyle = EditorStyles.wordWrappedLabel;
 
-		// 	if (attribute.ShowAbove)
-		// 	{
-		// 		Rect descriptionRect = position;
-		// 		descriptionRect.height = height;
+				SelfGUI(ref position, labelContent, labelStyle);
+			}
 
-		// 		EditorGUI.LabelField(descriptionRect, content, style);
+			base.LoadingGUI(position);
+		}
 
-		// 		position.yMin += height + EditorGUIUtility.standardVerticalSpacing;
-		// 		EditorGUI.PropertyField(position, property, label, property.isExpanded);
-		// 	}
-		// 	else
-		// 	{
-		// 		EditorGUI.PropertyField(position, property, label, property.isExpanded);
-		// 		position.yMax += height + EditorGUIUtility.standardVerticalSpacing;
-		// 		Rect descriptionRect = position;
-		// 		descriptionRect.yMin = position.yMax - height;
+		protected override float GetLoadingHeight()
+		{
+			var attribute = (DescriptionAttribute)Attribute;
+			float height = 0;
 
-		// 		EditorGUI.LabelField(descriptionRect, content, style);
-		// 	}
-		// }
+			if (attribute.Label is string label && label.Length != 0 && label[0] != PropertyFieldCompiler.ExpressionSymbol)
+			{
+				var labelContent = TempUtility.Content(label);
+				var labelStyle = EditorStyles.wordWrappedLabel;
 
-		// public override float GetElementHeight(SerializedProperty property, GUIContent label)
-		// {
-		// 	DescriptionAttribute attribute = this.attribute as DescriptionAttribute;
+				height += SelfHeight(labelContent, labelStyle);
+			}
 
-		// 	var content = AttributeEvaluator.TempContent(attribute, property);
-		// 	var style = AttributeEvaluator.ResolveStyle(attribute, property);
-
-		// 	_height ??= style.CalcHeight(content, EditorGUIUtility.currentViewWidth);
-
-		// 	return EditorGUI.GetPropertyHeight(property, label) + _height.Value + EditorGUIUtility.standardVerticalSpacing;
-		// }
-
-		// public override float GetArrayHeight(SerializedProperty property, GUIContent label)
-		// {
-		// 	return GetElementHeight(property, label);
-		// }
-
-		// public override void DrawArray(Rect position, SerializedProperty property, GUIContent label)
-		// {
-		// 	DrawElement(position, property, label);
-		// }
+			return height + base.GetLoadingHeight();
+		}
 	}
 }

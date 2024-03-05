@@ -9,32 +9,32 @@ namespace NAF.Inspector.Editor
 	[CustomPropertyDrawer(typeof(RequiredAttribute))]
 	public class ValidateAttributeDrawer : InlineLabelAttributeDrawer
 	{
-		private bool _cResult;
+		private AttributeExprCache<bool> conditional;
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override async Task OnEnable()
 		{
-			return Task.WhenAll(
-				base.OnEnable(property),
-				AttributeEvaluator.Load((IConditionalAttribute)Attribute, property)
-			);
+			Task baseTask = base.OnEnable();
+			conditional = await AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, Tree.Property);
+			await baseTask;
 		}
 
-		protected override void OnUpdate(SerializedProperty property)
+
+		protected override void OnUpdate()
 		{
-			((ValidateAttribute)Attribute).Style ??= EditorStyles.helpBox;
-			_cResult = AttributeEvaluator.Conditional((IConditionalAttribute)Attribute, property);
-			base.OnUpdate(property);
+			content.Refresh(Tree.Property);
+			style.Refresh(Tree.Property, EditorStyles.helpBox);
+			conditional.Refresh(Tree.Property);
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
-			if (!_cResult)
+			if (!conditional)
 			{
-				base.OnGUI(position, property, label);
+				base.OnGUI(position);
 				return;
 			}
 
-			Tree.OnGUI(position, property, label);
+			Tree.OnGUI(position);
 		}
 	}
 }

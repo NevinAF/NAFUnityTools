@@ -32,7 +32,7 @@ namespace NAF.Inspector.Editor
 
 		public static bool AllEqual<T>(this Span<T> array)
 		{
-			if (array.Length == 0)
+			if (array.Length <= 1)
 				return true;
 
 			T first = array[0];

@@ -6,39 +6,41 @@ namespace NAF.Inspector.Editor
 	using System.Collections.Generic;
 	using System.Linq.Expressions;
 	using System.Reflection;
+	using System.Runtime.CompilerServices;
 	using System.Threading.Tasks;
 	using UnityEditor;
+	using UnityEngine;
 
 	public static class PropertyTargets
 	{
-		public delegate GrabberResult ValueGrabber(UnityEngine.Object target, Span<int> arrayIndices);
+		public delegate (object?, object?) Resolver(UnityEngine.Object target, Span<int> arrayIndices);
 
-		public readonly struct GrabberValue
+		public readonly struct Cache
 		{
 			public readonly Type ValueType;
 			public readonly Type ParentType;
-			public readonly ValueGrabber Grabber;
+			public readonly Resolver Resolver;
 
-			public GrabberValue(Type valueType, Type parentType, ValueGrabber grabber)
+			public Cache(Type valueType, Type parentType, Resolver resolver)
 			{
 				ValueType = valueType;
 				ParentType = parentType;
-				Grabber = grabber;
+				Resolver = resolver;
 			}
 		}
 
-		private readonly struct GrabberKey : IEquatable<GrabberKey>
+		private readonly struct Key : IEquatable<Key>
 		{
 			public readonly Type host;
 			public readonly string path;
 
-			public GrabberKey(Type host, string path)
+			public Key(Type host, string path)
 			{
 				this.host = host;
 				this.path = path;
 			}
 
-			public readonly bool Equals(GrabberKey other)
+			public readonly bool Equals(Key other)
 			{
 				return object.Equals(host, other.host) && string.Equals(path, other.path);
 			}
@@ -50,7 +52,7 @@ namespace NAF.Inspector.Editor
 					return false;
 				}
 
-				return obj is GrabberKey cache && Equals(cache);
+				return obj is Key cache && Equals(cache);
 			}
 
 			public override readonly int GetHashCode()
@@ -59,19 +61,7 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		public readonly struct GrabberResult
-		{
-			public readonly object? Value;
-			public readonly object? Parent;
-
-			public GrabberResult(object? value, object? parent)
-			{
-				Value = value;
-				Parent = parent;
-			}
-
-			public static ConstructorInfo Constructor { get; } = typeof(GrabberResult).GetConstructor(new[] { typeof(object), typeof(object) })!;
-		}
+		public static ConstructorInfo ResolverResult { get; } = typeof((object?, object?)).GetConstructor(new[] { typeof(object), typeof(object) })!;
 
 		public readonly ref struct Result
 		{
@@ -94,27 +84,27 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		private struct ResultCache
+		private struct MemoResult
 		{
 			public SerializedObject serializedObject;
 			public string propertyPath;
 			public Memory<object?> FieldValues;
-			public Type FieldType;
 			public Memory<object?> ParentValues;
+			public Type FieldType;
 			public Type ParentType;
 
 			public bool Matches(SerializedProperty property) => property.serializedObject == serializedObject && string.Equals(property.propertyPath, propertyPath);
 			public Result ToSpan() => new Result(FieldValues.Span, FieldType, ParentValues.Span, ParentType);
 		}
 
-		private static readonly ConcurrentDictionary<GrabberKey, GrabberValue?> s_MethodInfoFromPropertyPathCache = new();
-		private static ResultCache s_lastCache = default;
+		private static readonly ConcurrentDictionary<Key, Cache?> s_MethodInfoFromPropertyPathCache = new();
+		private static MemoResult s_lastCache = default;
 
 		private static object?[] s_valueBuffer = new object?[8];
 		private static object?[] s_parentBuffer = new object?[8];
 
 
-		public static Result GetValues(SerializedProperty property)
+		public static Result Resolve(SerializedProperty property)
 		{
 			if (s_lastCache.Matches(property))
 				return s_lastCache.ToSpan();
@@ -135,20 +125,16 @@ namespace NAF.Inspector.Editor
 
 			Type targetType = targets[0].GetType();
 			s_lastCache.propertyPath = property.propertyPath;
-			GrabberKey key = new GrabberKey(targetType, s_lastCache.propertyPath);
-			GrabberValue value = GetNestedTargetGrabber(key) ??
-				throw new Exception("Could not find field info for property path '" + s_lastCache.propertyPath + "' on target object of type " + targetType.Name + ".");
+			Key key = new Key(targetType, s_lastCache.propertyPath);
+			Cache value = GetOrCreate(key) ??
+				throw CreateFieldException(key);
 
 			int conservativeMax = (s_lastCache.propertyPath.Length - 1) / 14;
 			Span<int> arrayInts = stackalloc int[conservativeMax];
 			IndicesInPath(arrayInts, s_lastCache.propertyPath);
 
 			for (int i = 0; i < targets.Length; i++)
-			{
-				GrabberResult r = value.Grabber(targets[i], arrayInts);
-				s_valueBuffer[i] = r.Value;
-				s_parentBuffer[i] = r.Parent;
-			}
+				(s_valueBuffer[i], s_parentBuffer[i]) = value.Resolver(targets[i], arrayInts);
 
 			s_lastCache.FieldValues = s_valueBuffer.AsMemory(0, targets.Length);
 			s_lastCache.FieldType = value.ValueType;
@@ -157,19 +143,47 @@ namespace NAF.Inspector.Editor
 			return s_lastCache.ToSpan();
 		}
 
-		public static GrabberValue Load(Type hostType, string propertyPath)
-		{
-			GrabberKey key = new GrabberKey(hostType, propertyPath);
-			return GetNestedTargetGrabber(key) ??
-				throw new Exception("Could not find field info for property path '" + propertyPath + "' on target object of type " + hostType.Name + ".");
-		}
-
-		public static Task<GrabberValue> Load(in SerializedProperty property)
+		public static Cache GetOrCreate(SerializedProperty property)
 		{
 			Type hostType = property.serializedObject.targetObject.GetType();
 			string propertyPath = property.propertyPath;
 
-			return Task.Run(() => Load(hostType, propertyPath));
+			Key key = new Key(hostType, propertyPath);
+			return GetOrCreate(key) ??
+				throw CreateFieldException(key);
+		}
+
+		public static Task<Cache> GetOrAsyncCreate(in SerializedProperty property)
+		{
+			Type hostType = property.serializedObject.targetObject.GetType();
+			string propertyPath = property.propertyPath;
+
+			Key key = new Key(hostType, propertyPath);
+			if (s_MethodInfoFromPropertyPathCache.TryGetValue(key, out Cache? grabber))
+			{
+				if (grabber != null)
+					return Task.FromResult(grabber.Value);
+				else return Task.FromException<Cache>(CreateFieldException(key));
+			}
+
+			return Task.Run(
+				() => (s_MethodInfoFromPropertyPathCache[key] = Create(key)) ??
+					throw CreateFieldException(key)
+			);
+		}
+
+		private static Cache? GetOrCreate(in Key key)
+		{
+			if (s_MethodInfoFromPropertyPathCache.TryGetValue(key, out Cache? grabber))
+				return grabber;
+
+			return s_MethodInfoFromPropertyPathCache[key] = Create(key);
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static Exception CreateFieldException(Key key)
+		{
+			return new Exception($"Could not find field info for property path '{key.path}' on target object of type {key.host.Name}.");
 		}
 
 		private static int SpanIndexer(Span<int> span, int index) => span[index];
@@ -177,11 +191,9 @@ namespace NAF.Inspector.Editor
 		private static MethodInfo MI_SpanIndexer => mi_SpanIndexer ??=
 			typeof(PropertyTargets).GetMethod(nameof(SpanIndexer), BindingFlags.Static | BindingFlags.NonPublic)!;
 
-		private static GrabberValue? GetNestedTargetGrabber(in GrabberKey key)
-		{
-			if (s_MethodInfoFromPropertyPathCache.TryGetValue(key, out GrabberValue? grabber))
-				return grabber;
 
+		private static Cache? Create(in Key key)
+		{
 			if (string.IsNullOrEmpty(key.path) || key.path[0] == '.')
 				throw new ArgumentException("Path must not be empty nor start with a '.'", nameof(key.path));
 
@@ -253,13 +265,23 @@ namespace NAF.Inspector.Editor
 					index++;
 
 				string fieldName = path.Slice(start, index - start).ToString();
-				FieldInfo? field = host!.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy);
+				FieldInfo? field;
+				Type? typeIterator = host;
 
-				if (field == null)
+				while(true)
 				{
-					host = null;
-					s_MethodInfoFromPropertyPathCache[key] = null;
-					return null;
+					field = typeIterator!.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+					if (field != null)
+						break;
+	
+					typeIterator = typeIterator.BaseType;
+					if (typeIterator == null || typeIterator == typeof(UnityEngine.Object))
+					{
+						UnityEngine.Debug.LogWarning("Could not find field '" + fieldName + "' on type " + host.Name + ".");
+						s_MethodInfoFromPropertyPathCache[key] = null;
+						return null;
+					}
 				}
 
 				parent = current;
@@ -271,17 +293,14 @@ namespace NAF.Inspector.Editor
 			} // End of while loop
 
 		exit:
-			Expression result = Expression.New(GrabberResult.Constructor,
+			Expression result = Expression.New(ResolverResult,
 				Expression.Convert(current, typeof(object)),
 				Expression.Convert(parent!, typeof(object))
 			);
 
-			grabber = new GrabberValue(current.Type, parent!.Type,
-				Expression.Lambda<ValueGrabber>(result, targetParameter, arrayIndicesParameter).Compile()
+			return new Cache(current.Type, parent!.Type,
+				Expression.Lambda<Resolver>(result, targetParameter, arrayIndicesParameter).Compile()
 			);
-
-			s_MethodInfoFromPropertyPathCache[key] = grabber;
-			return grabber;
 		}
 
 		internal static bool IsArrayOrList(this Type listType)
@@ -362,6 +381,169 @@ namespace NAF.Inspector.Editor
 
 		// 	return -1;
 		// }
+
+		public static void ModifyNumberProperty(this SerializedProperty property, Func<long, long> integer, Func<double, double> floating)
+		{
+			switch (property.propertyType)
+			{
+				case SerializedPropertyType.Integer: {
+					long old = property.longValue;
+					long mod = integer(old);
+					if (mod != old)
+						property.longValue = mod;
+					return;
+				}
+				case SerializedPropertyType.Vector2Int: {
+					Vector2Int old = property.vector2IntValue;
+					Vector2Int mod = new Vector2Int((int)integer(old.x), (int)integer(old.y));
+					if (mod != old)
+						property.vector2IntValue = mod;
+					return;
+				}
+				case SerializedPropertyType.Vector3Int: {
+					Vector3Int old = property.vector3IntValue;
+					Vector3Int mod = new Vector3Int((int)integer(old.x), (int)integer(old.y), (int)integer(old.z));
+					if (mod != old)
+						property.vector3IntValue = mod;
+					return;
+				}
+				case SerializedPropertyType.RectInt: {
+					RectInt old = property.rectIntValue;
+					RectInt mod = new RectInt((int)integer(old.x), (int)integer(old.y), (int)integer(old.width), (int)integer(old.height));
+					if (mod.x != old.x || mod.y != old.y || mod.width != old.width || mod.height != old.height)
+						property.rectIntValue = mod;
+					return;
+				}
+				case SerializedPropertyType.BoundsInt: {
+					BoundsInt old = property.boundsIntValue;
+					BoundsInt mod = new BoundsInt(new Vector3Int((int)integer(old.position.x), (int)integer(old.position.y), (int)integer(old.position.z)), new Vector3Int((int)integer(old.size.x), (int)integer(old.size.y), (int)integer(old.size.z)));
+					if (mod.position.x != old.position.x || mod.position.y != old.position.y || mod.position.z != old.position.z || mod.size.x != old.size.x || mod.size.y != old.size.y || mod.size.z != old.size.z)
+						property.boundsIntValue = mod;
+					return;
+				}
+				case SerializedPropertyType.Float: {
+					double old = property.doubleValue;
+					double mod = floating(old);
+					if (mod != old)
+						property.doubleValue = mod;
+					return;
+				}
+				case SerializedPropertyType.Vector2: {
+					Vector2 old = property.vector2Value;
+					Vector2 mod = new Vector2((float)floating(old.x), (float)floating(old.y));
+					if (mod != old)
+						property.vector2Value = mod;
+					return;
+				}
+				case SerializedPropertyType.Vector3: {
+					Vector3 old = property.vector3Value;
+					Vector3 mod = new Vector3((float)floating(old.x), (float)floating(old.y), (float)floating(old.z));
+					if (mod != old)
+						property.vector3Value = mod;
+					return;
+				}
+				case SerializedPropertyType.Vector4: {
+					Vector4 old = property.vector4Value;
+					Vector4 mod = new Vector4((float)floating(old.x), (float)floating(old.y), (float)floating(old.z), (float)floating(old.w));
+					if (mod != old)
+						property.vector4Value = mod;
+					return;
+				}
+				case SerializedPropertyType.Rect: {
+					Rect old = property.rectValue;
+					Rect mod = new Rect((float)floating(old.x), (float)floating(old.y), (float)floating(old.width), (float)floating(old.height));
+					if (mod.x != old.x || mod.y != old.y || mod.width != old.width || mod.height != old.height)
+						property.rectValue = mod;
+					return;
+				}
+				case SerializedPropertyType.Bounds: {
+					Bounds old = property.boundsValue;
+					Bounds mod = new Bounds(new Vector3((float)floating(old.center.x), (float)floating(old.center.y), (float)floating(old.center.z)), new Vector3((float)floating(old.size.x), (float)floating(old.size.y), (float)floating(old.size.z)));
+					if (mod.center.x != old.center.x || mod.center.y != old.center.y || mod.center.z != old.center.z || mod.size.x != old.size.x || mod.size.y != old.size.y || mod.size.z != old.size.z)
+						property.boundsValue = mod;
+					return;
+				}
+				default:
+					throw new NotImplementedException("Use ModifyNumberProperty only with numeric types!");
+			}
+		}
+
+		public static void SetPropertyValue(SerializedProperty property, object value)
+		{
+			switch (property.propertyType)
+			{
+				case SerializedPropertyType.Integer:
+					property.intValue = (int)value;
+					break;
+				case SerializedPropertyType.Boolean:
+					property.boolValue = (bool)value;
+					break;
+				case SerializedPropertyType.Float:
+					property.floatValue = (float)value;
+					break;
+				case SerializedPropertyType.String:
+					property.stringValue = (string)value;
+					break;
+				case SerializedPropertyType.Color:
+					property.colorValue = (UnityEngine.Color)value;
+					break;
+				case SerializedPropertyType.ObjectReference:
+					property.objectReferenceValue = (UnityEngine.Object)value;
+					break;
+				case SerializedPropertyType.LayerMask:
+					property.intValue = (int)value;
+					break;
+				case SerializedPropertyType.Enum:
+					property.enumValueIndex = (int)value;
+					break;
+				case SerializedPropertyType.Vector2:
+					property.vector2Value = (UnityEngine.Vector2)value;
+					break;
+				case SerializedPropertyType.Vector3:
+					property.vector3Value = (UnityEngine.Vector3)value;
+					break;
+				case SerializedPropertyType.Vector4:
+					property.vector4Value = (UnityEngine.Vector4)value;
+					break;
+				case SerializedPropertyType.Rect:
+					property.rectValue = (UnityEngine.Rect)value;
+					break;
+				case SerializedPropertyType.ArraySize:
+					property.arraySize = (int)value;
+					break;
+				case SerializedPropertyType.Character:
+					property.intValue = (char)value;
+					break;
+				case SerializedPropertyType.AnimationCurve:
+					property.animationCurveValue = (UnityEngine.AnimationCurve)value;
+					break;
+				case SerializedPropertyType.Bounds:
+					property.boundsValue = (UnityEngine.Bounds)value;
+					break;
+				case SerializedPropertyType.Quaternion:
+					property.quaternionValue = (UnityEngine.Quaternion)value;
+					break;
+				case SerializedPropertyType.ExposedReference:
+					property.exposedReferenceValue = (UnityEngine.Object)value;
+					break;
+				case SerializedPropertyType.FixedBufferSize:
+					throw new Exception("FixedBufferSize is not supported.");
+				case SerializedPropertyType.Vector2Int:
+					property.vector2IntValue = (UnityEngine.Vector2Int)value;
+					break;
+				case SerializedPropertyType.Vector3Int:
+					property.vector3IntValue = (UnityEngine.Vector3Int)value;
+					break;
+				case SerializedPropertyType.RectInt:
+					property.rectIntValue = (UnityEngine.RectInt)value;
+					break;
+				case SerializedPropertyType.BoundsInt:
+					property.boundsIntValue = (UnityEngine.BoundsInt)value;
+					break;
+				default:
+					throw new ArgumentOutOfRangeException();
+			}
+		}
 	}
 }
 #nullable restore

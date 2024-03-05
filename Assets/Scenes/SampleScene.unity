@@ -469,8 +469,8 @@ MonoBehaviour:
   __BasicValidate__: 0
   Positive: 45
   LessThan24Chars: Hello World
-  MagnitudeGreaterThanEpsilon: {x: 0, y: 0}
-  OneIsNaN: {x: 1, y: 3}
+  MagnitudeGreaterThanEpsilon: {x: 0.09, y: 0}
+  OneIsNaN: {x: 0.86, y: 3}
   NotNullWhenToggle: {fileID: 0}
   __LabelsIcons__: 0
   ArrayNotEmptyWarning: 
@@ -582,6 +582,57 @@ MonoBehaviour:
   Number_Is_Square: Enabled if the number is a perfect square.
   Vector2_X_Not_Multiple_Of_Y: Enabled if the x of the vector is not a multiple of
     the y.
+--- !u!1 &1870419731
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1870419733}
+  - component: {fileID: 1870419732}
+  m_Layer: 0
+  m_Name: Slider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1870419732
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1870419731}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b230459ae3364bb43a4e9e9d067dbf87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  __Title__: 0
+  TimeInSeconds: 14.6
+  DistanceInMeters: 89
+  MassInTons: 32
+  FloatAngleInDegrees: {x: 127.1, y: 261.2}
+  IntAngleInDegrees: {x: 0, y: 148}
+  Angle3Float: {x: 97.81, y: 184.7, z: 245.8}
+--- !u!4 &1870419733
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1870419731}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.9374635, y: -0.1422702, z: -2.834649}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2089795930
 GameObject:
   m_ObjectHideFlags: 0
@@ -612,14 +663,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   __Title__: 0
-  TimeInSeconds: 12.34
-  DistanceInMeters: 2390300
-  MassInTons: 255
-  AngleInDegrees: {x: 180, y: 90}
+  TimeInSeconds: 13.91
+  DistanceInMeters: 9
+  MassInTons: 9
+  AngleInDegrees: {x: 181.02, y: 90}
   VelocityInMetersPerSec: {x: 1.2, y: 2.3, z: 3.4}
   AccelerationInMilesPerHr2: {x: 9.8, y: 7.6, z: 5.4, w: 3.2}
-  ForceInNewtons: 1206.4000244140625
-  AreaInSqMeters: {x: 42, y: 36, z: 24}
+  ForceInNewtons: 1351.1
+  AreaInSqMeters: {x: 43, y: 36, z: 24}
   VolumeInCubicYards: 1423.3
 --- !u!4 &2089795932
 Transform:
@@ -646,3 +697,4 @@ SceneRoots:
   - {fileID: 898904720}
   - {fileID: 2089795932}
   - {fileID: 1736804882}
+  - {fileID: 1870419733}

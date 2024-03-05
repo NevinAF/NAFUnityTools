@@ -27,9 +27,9 @@ namespace NAF.Inspector.Editor
 			{ typeof(UnitsAttribute.Volume), Enum.GetNames(typeof(UnitsAttribute.Volume)).Select(x => new GUIContent(x, null, null)).ToArray() },
 		};
 
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override Task OnEnable()
 		{
-			var propertyType = property.propertyType;
+			var propertyType = Tree.Property.propertyType;
 			if (propertyType != SerializedPropertyType.Float &&
 				propertyType != SerializedPropertyType.Integer &&
 				propertyType != SerializedPropertyType.Vector2 &&
@@ -41,52 +41,130 @@ namespace NAF.Inspector.Editor
 				throw new NotSupportedException("Property type '" + propertyType + "' is not supported by the UnitsAttribute.");
 			}
 
-			return base.OnEnable(property);
+			return base.OnEnable();
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		public override bool EndsDrawing => true;
+
+		protected override float OnGetHeight()
 		{
-			float result = UnityInternals.EditorGUI_GetSinglePropertyHeight(property, label);
-			property.NextVisible(false); // FIXME: Skip all other drawers?
-			return result;
+			return UnityInternals.EditorGUI_GetSinglePropertyHeight(Tree.Property, Tree.PropertyLabel);
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
 			UnitsAttribute units = (UnitsAttribute)Attribute!;
-
+	
 			int index = InlineGUI.InlinePopup(ref position, Convert.ToInt32(units.value), TypeNames[units.value.GetType()]);
 			units.value = Enum.ToObject(units.value.GetType(), index);
 
+			SerializedProperty property = Tree.Property;
+			GUIContent label = Tree.PropertyLabel;
+
 			EditorGUI.BeginProperty(position, label, property);
 
-			if (property.propertyType == SerializedPropertyType.Float)
+			if (property.propertyType == SerializedPropertyType.Integer)
 			{
-				float value = property.floatValue;
-				float converted = UnitsAttribute.Convert(value, units.storeAs, units.value);
+				int value = property.intValue;
+				double converted = UnitsAttribute.Convert(value, units.storeAs, units.value);
 
 				EditorGUI.BeginChangeCheck();
-				converted = EditorGUI.FloatField(position, label, converted);
+				converted = EditorGUI.DelayedDoubleField(position, label, converted);
 				if (EditorGUI.EndChangeCheck())
 				{
-					property.floatValue = UnitsAttribute.Convert(converted, units.value, units.storeAs);
+					property.intValue = (int)Math.Round(UnitsAttribute.Convert(converted, units.value, units.storeAs));
+				}
+			}
+			else if (property.propertyType == SerializedPropertyType.Vector2Int)
+			{
+				Vector2Int value = property.vector2IntValue;
+				Span<float> floats = stackalloc float[2] {
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value)
+				};
+
+				EditorGUI.BeginChangeCheck();
+				position = EditorGUI.PrefixLabel(position, label);
+				DelayedAttributeDrawer.MultiDelayedFieldInternal(position, floats, DelayedAttributeDrawer.VECTOR_Labels);
+				if (EditorGUI.EndChangeCheck())
+				{
+					property.vector2IntValue = new Vector2Int(
+						(int)Math.Round(UnitsAttribute.Convert(floats[0], units.value, units.storeAs)),
+						(int)Math.Round(UnitsAttribute.Convert(floats[1], units.value, units.storeAs))
+					);
+				}
+			}
+			else if (property.propertyType == SerializedPropertyType.Vector3Int)
+			{
+				Vector3Int value = property.vector3IntValue;
+				Span<float> floats = stackalloc float[3] {
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.z, units.storeAs, units.value)
+				};
+
+				EditorGUI.BeginChangeCheck();
+				position = EditorGUI.PrefixLabel(position, label);
+				DelayedAttributeDrawer.MultiDelayedFieldInternal(position, floats, DelayedAttributeDrawer.VECTOR_Labels);
+				if (EditorGUI.EndChangeCheck())
+				{
+					property.vector3IntValue = new Vector3Int(
+						(int)Math.Round(UnitsAttribute.Convert(floats[0], units.value, units.storeAs)),
+						(int)Math.Round(UnitsAttribute.Convert(floats[1], units.value, units.storeAs)),
+						(int)Math.Round(UnitsAttribute.Convert(floats[2], units.value, units.storeAs))
+					);
+				}
+			}
+			else if (property.propertyType == SerializedPropertyType.RectInt)
+			{
+				RectInt value = property.rectIntValue;
+				Span<int> ints = stackalloc int[4] {
+					(int)Math.Round(UnitsAttribute.Convert(value.x, units.storeAs, units.value)),
+					(int)Math.Round(UnitsAttribute.Convert(value.y, units.storeAs, units.value)),
+					(int)Math.Round(UnitsAttribute.Convert(value.width, units.storeAs, units.value)),
+					(int)Math.Round(UnitsAttribute.Convert(value.height, units.storeAs, units.value))
+				};
+
+				EditorGUI.BeginChangeCheck();
+				position = EditorGUI.PrefixLabel(position, label);
+				DelayedAttributeDrawer.MultiDelayedFieldInternal(position, ints, DelayedAttributeDrawer.RECT_Labels);
+				if (EditorGUI.EndChangeCheck())
+				{
+					property.rectIntValue = new RectInt(
+						ints[0], ints[1], ints[2], ints[3]
+					);
+				}
+			}
+			else if (property.propertyType == SerializedPropertyType.Float)
+			{
+				double value = property.doubleValue;
+				double converted = UnitsAttribute.Convert(value, units.storeAs, units.value);
+
+				EditorGUI.BeginChangeCheck();
+				if (property.numericType == SerializedPropertyNumericType.Float)
+					converted = EditorGUI.FloatField(position, label, (float)converted);
+				else
+					converted = EditorGUI.DoubleField(position, label, converted);
+				if (EditorGUI.EndChangeCheck())
+				{
+					property.doubleValue = UnitsAttribute.Convert(converted, units.value, units.storeAs);
 				}
 			}
 			else if (property.propertyType == SerializedPropertyType.Vector2)
 			{
 				Vector2 value = property.vector2Value;
 				Vector2 converted = new Vector2(
-					UnitsAttribute.Convert(value.x, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.y, units.storeAs, units.value)
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value)
 				);
-
+				
 				EditorGUI.BeginChangeCheck();
 				converted = EditorGUI.Vector2Field(position, label, converted);
 				if (EditorGUI.EndChangeCheck())
 				{
 					property.vector2Value = new Vector2(
-						UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.y, units.value, units.storeAs)
+						(float)UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.y, units.value, units.storeAs)
 					);
 				}
 			}
@@ -94,19 +172,19 @@ namespace NAF.Inspector.Editor
 			{
 				Vector3 value = property.vector3Value;
 				Vector3 converted = new Vector3(
-					UnitsAttribute.Convert(value.x, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.y, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.z, units.storeAs, units.value)
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.z, units.storeAs, units.value)
 				);
-
+				
 				EditorGUI.BeginChangeCheck();
 				converted = EditorGUI.Vector3Field(position, label, converted);
 				if (EditorGUI.EndChangeCheck())
 				{
 					property.vector3Value = new Vector3(
-						UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.y, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.z, units.value, units.storeAs)
+						(float)UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.y, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.z, units.value, units.storeAs)
 					);
 				}
 			}
@@ -114,102 +192,50 @@ namespace NAF.Inspector.Editor
 			{
 				Vector4 value = property.vector4Value;
 				Vector4 converted = new Vector4(
-					UnitsAttribute.Convert(value.x, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.y, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.z, units.storeAs, units.value),
-					UnitsAttribute.Convert(value.w, units.storeAs, units.value)
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.z, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.w, units.storeAs, units.value)
 				);
-
+				
 				EditorGUI.BeginChangeCheck();
 				converted = EditorGUI.Vector4Field(position, label, converted);
 				if (EditorGUI.EndChangeCheck())
 				{
 					property.vector4Value = new Vector4(
-						UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.y, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.z, units.value, units.storeAs),
-						UnitsAttribute.Convert(converted.w, units.value, units.storeAs)
+						(float)UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.y, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.z, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.w, units.value, units.storeAs)
 					);
 				}
 			}
-			else if (property.propertyType == SerializedPropertyType.Integer)
+			else if (property.propertyType == SerializedPropertyType.Rect)
 			{
-				int value = property.intValue;
-				float converted = UnitsAttribute.Convert(value, units.storeAs, units.value);
+				Rect value = property.rectValue;
+				Rect converted = new Rect(
+					(float)UnitsAttribute.Convert(value.x, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.y, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.width, units.storeAs, units.value),
+					(float)UnitsAttribute.Convert(value.height, units.storeAs, units.value)
+				);
 
 				EditorGUI.BeginChangeCheck();
-				converted = EditorGUI.DelayedFloatField(position, label, converted);
+				converted = EditorGUI.RectField(position, label, converted);
 				if (EditorGUI.EndChangeCheck())
 				{
-					property.intValue = Mathf.RoundToInt(UnitsAttribute.Convert(converted, units.value, units.storeAs));
-				}
-			}
-			else if (property.propertyType == SerializedPropertyType.Vector2Int)
-			{
-				Vector2Int value = property.vector2IntValue;
-				_v2Values[0] = UnitsAttribute.Convert(value.x, units.storeAs, units.value);
-				_v2Values[1] = UnitsAttribute.Convert(value.y, units.storeAs, units.value);
-
-				EditorGUI.BeginChangeCheck();
-				position = EditorGUI.PrefixLabel(position, label);
-				MultiDelayedFloatFieldInternal(position, _v2Labels, _v2Values);
-				if (EditorGUI.EndChangeCheck())
-				{
-					property.vector2IntValue = new Vector2Int(
-						Mathf.RoundToInt(UnitsAttribute.Convert(_v2Values[0], units.value, units.storeAs)),
-						Mathf.RoundToInt(UnitsAttribute.Convert(_v2Values[1], units.value, units.storeAs))
+					property.rectValue = new Rect(
+						(float)UnitsAttribute.Convert(converted.x, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.y, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.width, units.value, units.storeAs),
+						(float)UnitsAttribute.Convert(converted.height, units.value, units.storeAs)
 					);
 				}
 			}
-			else if (property.propertyType == SerializedPropertyType.Vector3Int)
-			{
-				Vector3Int value = property.vector3IntValue;
-				_v3Values[0] = UnitsAttribute.Convert(value.x, units.storeAs, units.value);
-				_v3Values[1] = UnitsAttribute.Convert(value.y, units.storeAs, units.value);
-				_v3Values[2] = UnitsAttribute.Convert(value.z, units.storeAs, units.value);
 
-				EditorGUI.BeginChangeCheck();
-				position = EditorGUI.PrefixLabel(position, label);
-				MultiDelayedFloatFieldInternal(position, _v3Labels, _v3Values);
-				if (EditorGUI.EndChangeCheck())
-				{
-					property.vector3IntValue = new Vector3Int(
-						Mathf.RoundToInt(UnitsAttribute.Convert(_v3Values[0], units.value, units.storeAs)),
-						Mathf.RoundToInt(UnitsAttribute.Convert(_v3Values[1], units.value, units.storeAs)),
-						Mathf.RoundToInt(UnitsAttribute.Convert(_v3Values[2], units.value, units.storeAs))
-					);
-				}
-			}
 			else throw new NotImplementedException("Property type '" + property.propertyType + "' is supported but somehow was not drawn properly.");
 
 			EditorGUI.EndProperty();
-
-			property.NextVisible(false); // FIXME: Skip all other drawers?
-		}
-
-		private static GUIContent[] _v2Labels = new GUIContent[] { new GUIContent("X"), new GUIContent("Y") };
-		private static GUIContent[] _v3Labels = new GUIContent[] { new GUIContent("X"), new GUIContent("Y"), new GUIContent("Z") };
-		private static float[] _v2Values = new float[2];
-		private static float[] _v3Values = new float[3];
-
-		private static void MultiDelayedFloatFieldInternal(Rect position, GUIContent[] subLabels, float[] values)
-		{
-			const float kSpacingSubLabel = 4f;
-
-			int eCount = values.Length;
-			float w = (position.width - (eCount - 1) * kSpacingSubLabel) / eCount;
-			Rect nr = new Rect(position) {width = w};
-
-			using var _i  = IndentScope.Zero;
-			using var labelWidth = LabelWidthScope.Zero;
-
-			for (int i = 0; i < values.Length; i++)
-			{
-				using (new LabelWidthScope(subLabels[i]))
-					values[i] = EditorGUI.DelayedFloatField(nr, subLabels[i], values[i]);
-
-				nr.x += w + kSpacingSubLabel;
-			}
 		}
 	}
 }

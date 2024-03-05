@@ -47,9 +47,9 @@ namespace NAF.Inspector.Editor
 		public const string CopyIcon = EditorIcons.Clipboard;
 
 		private MemberColorizer.Result? colorized;
-		protected override Task OnEnable(in SerializedProperty property)
+		protected override Task OnEnable()
 		{
-			MemberInfo member = Member(property);
+			MemberInfo member = Member();
 
 			if (member.Name.StartsWith("__") && member.Name.EndsWith("__"))
 			{
@@ -64,22 +64,22 @@ namespace NAF.Inspector.Editor
 			});
 		}
 
-		private MemberInfo Member(SerializedProperty property)
+		private MemberInfo Member()
 		{
-			if (FieldInfo != null)
-				return FieldInfo;
+			if (Tree.FieldInfo != null)
+				return Tree.FieldInfo;
 
-			if (property.name == "m_Script")
-				return property.serializedObject.targetObject.GetType();
+			if (Tree.Property.name == "m_Script")
+				return Tree.Property.serializedObject.targetObject.GetType();
 
 			return null;
 		}
 
-		protected override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+		protected override void OnGUI(Rect position)
 		{
-			if (property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
+			if (Tree.Property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
 			{
-				base.OnGUI(position, property, label);
+				base.OnGUI(position);
 				return;
 			}
 
@@ -98,7 +98,7 @@ namespace NAF.Inspector.Editor
 				definitionRect.height = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
 				// position.height = propHeight;
-				base.OnGUI(position, property, label);
+				base.OnGUI(position);
 
 
 				using (DisabledScope.False)
@@ -111,24 +111,11 @@ namespace NAF.Inspector.Editor
 				definitionRect.height = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
 				position.yMin += definitionRect.height + EditorGUIUtility.standardVerticalSpacing;
-				base.OnGUI(position, property, label);
+				base.OnGUI(position);
 
 				using (DisabledScope.False)
 					copied = GUI.Button(definitionRect, TempUtility.Content(colorized.Value.RichText), hovered ? HoverStyle : NormalStyle);
 			}
-
-			// Rect copyButton = definitionRect;
-			// copyButton.xMin = copyButton.xMax - 20f;
-			// copyButton.height = 20f;
-
-			// using (IconSizeScope.Mini)
-			// using (DisabledScope.False)
-			// {
-			// 	if (GUI.Button(copyButton, TempUtility.Content(null, CopyIcon), EditorStyles.miniButton))
-			// 	{
-			// 		EditorGUIUtility.systemCopyBuffer = colorized.Value.PlainText;
-			// 	}
-			// }
 
 			if (copied)
 			{
@@ -136,19 +123,37 @@ namespace NAF.Inspector.Editor
 			}
 		}
 
-		protected override float OnGetHeight(SerializedProperty property, GUIContent label)
+		protected override float OnGetHeight()
 		{
-			if (property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
-				return base.OnGetHeight(property, label);
+			if (Tree.Property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
+				return base.OnGetHeight();
 
-			float prop = base.OnGetHeight(property, label);
+			float prop = base.OnGetHeight();
 			float drawer = NormalStyle.margin.vertical + NormalStyle.lineHeight * colorized.Value.Lines;
 
-			float spacing = UnityInternals.SerializedProperty_isValid(property) ? EditorGUIUtility.standardVerticalSpacing * 1.5f : 0f;
+			// TODO?
+			// float spacing = UnityInternals.SerializedProperty_isValid(Tree.Property) ? EditorGUIUtility.standardVerticalSpacing * 1.5f : 0f;
+			float spacing = EditorGUIUtility.standardVerticalSpacing * 1.5f;
 
 			if (CurrentDrawType == DrawType.TwoColumn)
 				return Mathf.Max(prop, drawer) + spacing;
 			return prop + drawer + spacing + EditorGUIUtility.standardVerticalSpacing;
+		}
+
+		protected override float GetLoadingHeight()
+		{
+			float prop = base.GetLoadingHeight();
+
+			if (Tree.Property.depth > 0 || CurrentDrawType == DrawType.No || colorized == null)
+				return prop;
+
+			// TODO?
+			// float spacing = UnityInternals.SerializedProperty_isValid(Tree.Property) ? EditorGUIUtility.standardVerticalSpacing * 1.5f : 0f;
+			float spacing = EditorGUIUtility.standardVerticalSpacing * 1.5f;
+
+			if (CurrentDrawType == DrawType.TwoColumn)
+				return prop + spacing;
+			return prop + spacing + EditorGUIUtility.standardVerticalSpacing;
 		}
 	}
 }
