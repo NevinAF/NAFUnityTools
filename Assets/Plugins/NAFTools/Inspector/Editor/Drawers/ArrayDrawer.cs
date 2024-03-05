@@ -237,7 +237,7 @@ namespace NAF.Inspector.Editor
 		{
 		}
 
-		protected List<PropertyTree> _trees;
+		protected List<PropertyTree>? _trees;
 	
 		public override void OnInspectorGUI()
 		{
@@ -264,7 +264,7 @@ namespace NAF.Inspector.Editor
 			EditorGUI.BeginChangeCheck();
 			serializedObject.UpdateIfRequiredOrScript();
 
-			for (int index = 0; index < _trees.Count; index++)
+			for (int index = 0; index < _trees!.Count; index++)
 			{
 				using (new EditorGUI.DisabledScope("m_Script" == _trees[index].Property.propertyPath))
 					_trees[index].OnGUILayout();

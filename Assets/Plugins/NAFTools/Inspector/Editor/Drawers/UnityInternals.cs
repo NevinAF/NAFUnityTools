@@ -325,5 +325,19 @@ namespace NAF.Inspector.Editor
 				_editorGUIUtility_set_s_OverriddenViewWidth(value);
 			}
 		}
+
+		// EditorGUIUtility:
+		// internal static Texture2D LoadIcon(string name)
+		private static Func<string, Texture2D> _editorGUIUtility_LoadIcon;
+		public static Texture2D EditorGUIUtility_LoadIcon(string name)
+		{
+			if (_editorGUIUtility_LoadIcon == null)
+			{
+				MethodInfo loadIconMethod = typeof(EditorGUIUtility).GetMethod("LoadIcon", BindingFlags.NonPublic | BindingFlags.Static);
+				EmitUtils.BoxedMember(loadIconMethod, out _editorGUIUtility_LoadIcon);
+			}
+
+			return _editorGUIUtility_LoadIcon(name);
+		}
 	}
 }

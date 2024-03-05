@@ -14,7 +14,7 @@ namespace NAF.Inspector.Editor
 			return string.IsNullOrEmpty(icon) ? null : EditorGUIUtility.IconContent(icon).image;
 		}
 
-		public static GUIContent Content(string? text, Texture? image, string? tooltip = null)
+		public static GUIContent Content(string? text, Texture? image = null, string? tooltip = null)
 		{
 			_tempContent.text = text;
 			_tempContent.tooltip = tooltip;
@@ -22,7 +22,7 @@ namespace NAF.Inspector.Editor
 			return _tempContent;
 		}
 
-		public static GUIContent Content(string? text, string? image = null, string? tooltip = null)
+		public static GUIContent Content(string? text, string? image, string? tooltip = null)
 		{
 			_tempContent.text = text;
 			_tempContent.tooltip = tooltip;

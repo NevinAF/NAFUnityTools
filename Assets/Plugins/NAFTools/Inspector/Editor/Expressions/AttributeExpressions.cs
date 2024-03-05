@@ -103,9 +103,8 @@ namespace NAF.Inspector.Editor
 			{
 				try
 				{
-					Func<object?, object?, T?>? func = PropertyFieldCompiler<T>.GetOrCreate(property, expression);
-					if (func != null)
-						return new AttributeExpr<T>(func);
+					Func<object?, object?, T?> func = PropertyFieldCompiler<T>.GetOrCreate(property, expression);
+					return new AttributeExpr<T>(func);
 				}
 				catch (Exception exception)
 				{
@@ -121,25 +120,30 @@ namespace NAF.Inspector.Editor
 		public static Task<AttributeExpr<T>> AsyncCreate(in SerializedProperty property, object? expressionOrValue)
 		{
 			if (expressionOrValue is string expression && expression.Length > 0)
-				return AsyncCreate(PropertyFieldCompiler<T>.GetOrAsyncCreate(property, expression), expressionOrValue);
+				return AsyncCreate(PropertyFieldCompiler<T>.GetOrAsyncCreate(property, expression), expression);
 
 			return Task.FromResult(Constant(expressionOrValue));
 		}
 
-		private static async Task<AttributeExpr<T>> AsyncCreate(Task<Func<object?, object?, T?>> funcTask, object expressionOrValue)
+		private static async Task<AttributeExpr<T>> AsyncCreate(Task<Func<object?, object?, T?>> funcTask, string expression)
 		{
 			try {
 				var func = await funcTask;
-				if (func != null)
-					return new AttributeExpr<T>(func);
+				return new AttributeExpr<T>(func);
 			}
 			catch (Exception e)
 			{
-				if ((expressionOrValue as string)![0] == PropertyFieldCompiler.ExpressionSymbol)
+				if (expression[0] == PropertyFieldCompiler.ExpressionSymbol)
 					return Constant(e);
+				
+				var result = Constant(expression);
+				if (result.IsFaulted)
+				{
+					return new AttributeExpr<T>(new Exception("String expression '" + expression + "' could not be resolved as a '" + typeof(T).Name + "' type and could not be compiled.\n\nExpression Error: " + e.ToString() + "\n\nCast Error: " + result._captured!.ToString()));
+				}
 			}
 
-			return Constant(expressionOrValue);
+			return Constant(expression);
 		}
 
 		public static AttributeExpr<T> Constant(object? value)

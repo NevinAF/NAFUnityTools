@@ -25,7 +25,7 @@ namespace NAF.Inspector.Editor
 		{
 			var unityObjects = TypeCache.GetTypesDerivedFrom(typeof(UnityEngine.Object));
 
-			Type[] types = new Type[unityObjects.Count + 59];
+			Type[] types = new Type[unityObjects.Count + 60];
 			types[0] = typeof(System.Object);
 			types[1] = typeof(System.String);
 			types[2] = typeof(System.Enum);
@@ -85,7 +85,8 @@ namespace NAF.Inspector.Editor
 			types[56] = typeof(UnityEngine.Vector3Int);
 			types[57] = typeof(UnityEngine.RectInt);
 			types[58] = typeof(UnityEngine.BoundsInt);
-			unityObjects.CopyTo(types, 59);
+			types[59] = typeof(NAF.Inspector.EditorIcons);
+			unityObjects.CopyTo(types, 60);
 
 			return types;
 		}
@@ -136,16 +137,15 @@ namespace NAF.Inspector.Editor
 			if (obj == null)
 				return null;
 
-			if (obj is Texture style)
-				return style;
+			if (obj is Texture texture)
+				return texture;
 
-			if (obj is string styleName) try
+			if (obj is string iconName)
 			{
-				return TempUtility.EditorTexture(styleName);
-			}
-			catch (Exception e)
-			{
-				throw new ArgumentException($"Cannot resolve texture from string '{styleName}'", e);
+				Texture e = UnityInternals.EditorGUIUtility_LoadIcon(iconName);
+				if (e != null)
+					return e;
+				throw new ArgumentException($"Cannot resolve texture from the string '{iconName}'");
 			}
 
 			throw new ArgumentException($"Cannot resolve style from type {obj!.GetType()} (value: {obj})");

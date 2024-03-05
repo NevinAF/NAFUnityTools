@@ -16,12 +16,8 @@ namespace NAF.Inspector.Editor
 
 		protected override async Task OnEnable()
 		{
-			try {
 			var contentAttribute = (IContentAttribute)Attribute;
 			(content, style) = await AttributeEvaluator.Content(contentAttribute, Tree.Property);
-			} catch (Exception e) {
-				Debug.LogError(e);
-			}
 		}
 
 		protected override void OnUpdate()

@@ -21,14 +21,31 @@ namespace NAF.ExpressionCompiler
 			Expression exprTrue = ExpectTerm(ifTrue);
 			Expression exprFalse = ExpectTerm(ifFalse);
 
-			Expression? convert = TryConvert(ifTrue, exprFalse.Type);
-	
-			if (convert != null)
-				exprTrue = convert;
+			bool trueIsNull = exprTrue is ConstantExpression trueConst && trueConst.Value is null;
+			bool falseIsNull = exprFalse is ConstantExpression falseConst && falseConst.Value is null;
+
+			if (trueIsNull && falseIsNull)
+				return new Term(Expression.Constant(null, typeof(object)), test.start, ifFalse.start + ifFalse.length - test.start);
+
+			if (trueIsNull)
+			{
+				exprTrue = Expression.Constant(null, exprFalse.Type);
+			}
+			else if (falseIsNull)
+			{
+				exprFalse = Expression.Constant(null, exprTrue.Type);
+			}
 			else
 			{
-				exprFalse = TryConvert(ifFalse, exprTrue.Type) ??
-					throw new OperationException(expression, question, colon, test, ifTrue, ifFalse, "No coercion operator is defined between types '" + ExpectTerm(ifTrue).Type.Name + "' and '" + ExpectTerm(ifFalse).Type.Name + "'. The 'ifTrue' and 'ifFalse' expressions of a ternary conditional statement must be assinable to each others type (common types are not infered).");
+				Expression? convert = TryConvert(ifTrue, exprFalse.Type);
+		
+				if (convert != null)
+					exprTrue = convert;
+				else
+				{
+					exprFalse = TryConvert(ifFalse, exprTrue.Type) ??
+						throw new OperationException(expression, question, colon, test, ifTrue, ifFalse, "No coercion operator is defined between types '" + ExpectTerm(ifTrue).Type.Name + "' and '" + ExpectTerm(ifFalse).Type.Name + "'. The 'ifTrue' and 'ifFalse' expressions of a ternary conditional statement must be assinable to each others type (common types are not infered).");
+				}
 			}
 
 			return new Term(ExpressionConstructors.FullConditionalConstructor(exprTest, exprTrue, exprFalse), test.start, ifFalse.start + ifFalse.length - test.start);
