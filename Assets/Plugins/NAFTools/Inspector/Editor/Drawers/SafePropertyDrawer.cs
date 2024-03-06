@@ -161,6 +161,7 @@ namespace NAF.Inspector.Editor
 		{
 			if (!Invalidated && UsesUpdate)
 			{
+				UnityEngine.Debug.Log("Invalidate(" + GetType().Name + ")");
 				Invalidated = true;
 				return true;
 			}

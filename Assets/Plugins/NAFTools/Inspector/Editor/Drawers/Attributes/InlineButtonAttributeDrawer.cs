@@ -33,7 +33,8 @@ namespace NAF.Inspector.Editor
 			InlineButtonAttribute attribute = (InlineButtonAttribute)Attribute;
 
 			GUIContent content = this.content;
-			content.text ??= ObjectNames.NicifyVariableName(attribute.Expression);
+			if (content.text == null && content.image == null)
+				content.text = ObjectNames.NicifyVariableName(attribute.Expression);
 
 			if (DrawAsButton(attribute.Alignment, position, content, style))
 				AttributeExpr<object>.Invoke(Tree.Property, attribute.Expression);

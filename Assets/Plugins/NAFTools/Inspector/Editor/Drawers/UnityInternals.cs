@@ -190,7 +190,8 @@ namespace NAF.Inspector.Editor
 		{
 			if (_propertyDrawer_HandleDrawnType == null)
 			{
-				MethodInfo handleDrawnTypeMethod = PropertyHandlerType.GetMethod("HandleDrawnType", BindingFlags.NonPublic | BindingFlags.Instance);
+				MethodInfo handleDrawnTypeMethod = PropertyHandlerType.GetMethod("HandleDrawnType", BindingFlags.Public | BindingFlags.Instance) ??
+					throw new InvalidOperationException("Method HandleDrawnType not found.");
 				EmitUtils.BoxedMember(handleDrawnTypeMethod, out _propertyDrawer_HandleDrawnType);
 			}
 
